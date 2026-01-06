@@ -66,14 +66,16 @@ export function SyncHistoryPanel({ onClose }: SyncHistoryPanelProps) {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-bg-primary">
-      {/* Toolbar */}
+      {/* Toolbar - add left padding for macOS traffic lights */}
       <MacToolbar>
-        <MacButton variant="ghost" size="sm" onClick={onClose}>
-          <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          返回
-        </MacButton>
+        <div className="pl-16">
+          <MacButton variant="ghost" size="sm" onClick={onClose}>
+            <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            返回
+          </MacButton>
+        </div>
         <ToolbarTitle>同步历史</ToolbarTitle>
       </MacToolbar>
 

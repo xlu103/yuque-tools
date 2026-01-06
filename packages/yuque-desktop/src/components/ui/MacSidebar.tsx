@@ -3,18 +3,34 @@ import { ReactNode } from 'react'
 interface MacSidebarProps {
   children: ReactNode
   className?: string
+  topContent?: ReactNode
+  bottomContent?: ReactNode
 }
 
-export function MacSidebar({ children, className = '' }: MacSidebarProps) {
+export function MacSidebar({ children, className = '', topContent, bottomContent }: MacSidebarProps) {
   return (
-    <aside className={`mac-sidebar ${className}`}>
+    <aside className={`mac-sidebar flex flex-col ${className}`}>
       {/* Titlebar drag region for traffic lights */}
       <div className="h-[52px] flex-shrink-0 titlebar-drag-region" />
       
-      {/* Sidebar content */}
-      <div className="flex-1 overflow-y-auto px-3 pb-4">
+      {/* Fixed top content */}
+      {topContent && (
+        <div className="flex-shrink-0 px-3 pb-2">
+          {topContent}
+        </div>
+      )}
+      
+      {/* Sidebar content - scrollable */}
+      <div className="flex-1 overflow-y-auto px-3 min-h-0">
         {children}
       </div>
+      
+      {/* Fixed bottom content */}
+      {bottomContent && (
+        <div className="flex-shrink-0 px-3 pb-4 pt-2 border-t border-border-light">
+          {bottomContent}
+        </div>
+      )}
     </aside>
   )
 }
