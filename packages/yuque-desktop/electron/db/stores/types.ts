@@ -104,4 +104,63 @@ export interface AppSettings {
   linebreak: boolean
   latexcode: boolean
   theme: 'system' | 'light' | 'dark'
+  autoSyncInterval: 0 | 30 | 60 | 720 | 1440 // 0 = disabled, others in minutes
+}
+
+
+// ============================================
+// Sync Session Types (断点续传)
+// ============================================
+
+export interface SyncSessionRecord {
+  id: number
+  book_ids: string  // JSON array
+  total_docs: number
+  completed_doc_ids: string  // JSON array
+  status: 'running' | 'interrupted' | 'completed'
+  started_at: string
+  updated_at: string
+}
+
+export interface SyncSessionInput {
+  bookIds: string[]
+  totalDocs: number
+}
+
+export interface SyncSessionUpdate {
+  completedDocIds?: string[]
+  status?: 'running' | 'interrupted' | 'completed'
+}
+
+// ============================================
+// Resource Types (图片和附件)
+// ============================================
+
+export interface ResourceRecord {
+  id: number
+  doc_id: string
+  type: 'image' | 'attachment'
+  remote_url: string
+  local_path: string | null
+  filename: string | null
+  size_bytes: number | null
+  status: 'pending' | 'downloaded' | 'failed'
+  created_at: string
+}
+
+export interface ResourceInput {
+  docId: string
+  type: 'image' | 'attachment'
+  remoteUrl: string
+  localPath?: string
+  filename?: string
+  sizeBytes?: number
+  status?: 'pending' | 'downloaded' | 'failed'
+}
+
+export interface ResourceUpdate {
+  localPath?: string
+  filename?: string
+  sizeBytes?: number
+  status?: 'pending' | 'downloaded' | 'failed'
 }

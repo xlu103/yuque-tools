@@ -38,6 +38,11 @@ const electronAPI: IPCInvokeAPI & IPCEventAPI = {
   'settings:set': (settings) => ipcRenderer.invoke('settings:set', settings),
   'settings:selectDirectory': () => ipcRenderer.invoke('settings:selectDirectory'),
 
+  // File operations
+  'file:open': (filePath) => ipcRenderer.invoke('file:open', filePath),
+  'file:openInYuque': (params) => ipcRenderer.invoke('file:openInYuque', params),
+  'file:showInFolder': (filePath) => ipcRenderer.invoke('file:showInFolder', filePath),
+
   // Event listeners
   on: (channel, callback) => {
     const subscription = (_event: Electron.IpcRendererEvent, data: unknown) => {

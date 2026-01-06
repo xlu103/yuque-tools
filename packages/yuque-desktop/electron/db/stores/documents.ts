@@ -240,7 +240,8 @@ export function getDocumentCountByStatus(): Record<string, number> {
     pending: 0,
     modified: 0,
     new: 0,
-    deleted: 0
+    deleted: 0,
+    failed: 0
   }
   
   for (const row of rows) {

@@ -3,7 +3,7 @@
  * SQLite schema for Meta Store - stores document metadata, sync history, and settings
  */
 
-export const SCHEMA_VERSION = 3
+export const SCHEMA_VERSION = 4
 
 /**
  * SQL statements to create all tables
@@ -53,6 +53,31 @@ CREATE TABLE IF NOT EXISTS sync_history (
   error_message TEXT
 );
 
+-- 同步会话 (Sync Sessions) - 用于断点续传
+CREATE TABLE IF NOT EXISTS sync_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_ids TEXT NOT NULL,
+  total_docs INTEGER DEFAULT 0,
+  completed_doc_ids TEXT DEFAULT '[]',
+  status TEXT DEFAULT 'running' CHECK(status IN ('running', 'interrupted', 'completed')),
+  started_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- 资源表 (Resources) - 图片和附件
+CREATE TABLE IF NOT EXISTS resources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  doc_id TEXT NOT NULL,
+  type TEXT NOT NULL CHECK(type IN ('image', 'attachment')),
+  remote_url TEXT NOT NULL,
+  local_path TEXT,
+  filename TEXT,
+  size_bytes INTEGER,
+  status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'downloaded', 'failed')),
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
+);
+
 -- 应用设置 (Settings)
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
@@ -64,6 +89,9 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE INDEX IF NOT EXISTS idx_documents_book_id ON documents(book_id);
 CREATE INDEX IF NOT EXISTS idx_documents_sync_status ON documents(sync_status);
 CREATE INDEX IF NOT EXISTS idx_sync_history_started_at ON sync_history(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sync_sessions_status ON sync_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_resources_doc_id ON resources(doc_id);
+CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type);
 
 -- 认证会话 (Auth Session)
 CREATE TABLE IF NOT EXISTS auth_session (
@@ -111,6 +139,41 @@ ALTER TABLE documents_new RENAME TO documents;
 -- Recreate indexes
 CREATE INDEX IF NOT EXISTS idx_documents_book_id ON documents(book_id);
 CREATE INDEX IF NOT EXISTS idx_documents_sync_status ON documents(sync_status);
+`
+
+/**
+ * Migration SQL for version 4: Add sync_sessions and resources tables
+ */
+export const MIGRATION_V4_SQL = `
+-- 同步会话表 (用于断点续传)
+CREATE TABLE IF NOT EXISTS sync_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  book_ids TEXT NOT NULL,
+  total_docs INTEGER DEFAULT 0,
+  completed_doc_ids TEXT DEFAULT '[]',
+  status TEXT DEFAULT 'running' CHECK(status IN ('running', 'interrupted', 'completed')),
+  started_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now'))
+);
+
+-- 资源表 (图片和附件)
+CREATE TABLE IF NOT EXISTS resources (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  doc_id TEXT NOT NULL,
+  type TEXT NOT NULL CHECK(type IN ('image', 'attachment')),
+  remote_url TEXT NOT NULL,
+  local_path TEXT,
+  filename TEXT,
+  size_bytes INTEGER,
+  status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'downloaded', 'failed')),
+  created_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (doc_id) REFERENCES documents(id) ON DELETE CASCADE
+);
+
+-- 索引
+CREATE INDEX IF NOT EXISTS idx_sync_sessions_status ON sync_sessions(status);
+CREATE INDEX IF NOT EXISTS idx_resources_doc_id ON resources(doc_id);
+CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type);
 `
 
 /**

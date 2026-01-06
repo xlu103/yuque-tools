@@ -102,6 +102,17 @@ export interface FailedDocument {
   updatedAt: string
 }
 
+export interface FileOperationResult {
+  success: boolean
+  error?: string
+}
+
+export interface OpenInYuqueParams {
+  userLogin: string
+  bookSlug: string
+  docSlug: string
+}
+
 // ============================================
 // IPC Channel Definitions
 // ============================================
@@ -133,6 +144,11 @@ export interface IPCChannels {
   'settings:get': () => Promise<AppSettings>
   'settings:set': (settings: Partial<AppSettings>) => Promise<void>
   'settings:selectDirectory': () => Promise<string | null>
+
+  // File operations
+  'file:open': (filePath: string) => Promise<FileOperationResult>
+  'file:openInYuque': (params: OpenInYuqueParams) => Promise<FileOperationResult>
+  'file:showInFolder': (filePath: string) => Promise<FileOperationResult>
 }
 
 /**

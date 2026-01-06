@@ -9,7 +9,9 @@ import type {
   SyncStatus, 
   ChangeSet,
   SyncHistoryItem,
-  FailedDocument
+  FailedDocument,
+  FileOperationResult,
+  OpenInYuqueParams
 } from './types'
 import {
   // Settings
@@ -43,6 +45,11 @@ import {
   getSyncStatus,
   getChangesForBooks
 } from '../services/sync'
+import {
+  openFile,
+  openInYuque,
+  showInFolder
+} from '../services/fileManager'
 
 /**
  * Register all IPC handlers
@@ -354,5 +361,24 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
     }
     
     return result.filePaths[0]
+  })
+
+  // ============================================
+  // File Operation Handlers
+  // ============================================
+
+  ipcMain.handle('file:open', async (_event, filePath: string): Promise<FileOperationResult> => {
+    console.log('file:open called for:', filePath)
+    return await openFile(filePath)
+  })
+
+  ipcMain.handle('file:openInYuque', async (_event, params: OpenInYuqueParams): Promise<FileOperationResult> => {
+    console.log('file:openInYuque called with:', params)
+    return await openInYuque(params.userLogin, params.bookSlug, params.docSlug)
+  })
+
+  ipcMain.handle('file:showInFolder', async (_event, filePath: string): Promise<FileOperationResult> => {
+    console.log('file:showInFolder called for:', filePath)
+    return await showInFolder(filePath)
   })
 }

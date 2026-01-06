@@ -18,5 +18,11 @@ export * from './settings'
 // Sync history store
 export * from './syncHistory'
 
+// Sync sessions store (断点续传)
+export * from './syncSessions'
+
+// Resources store (图片和附件)
+export * from './resources'
+
 // Types
 export * from './types'

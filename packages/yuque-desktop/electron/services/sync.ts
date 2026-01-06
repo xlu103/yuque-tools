@@ -20,9 +20,21 @@ import {
   completeSyncHistoryFailed,
   cancelSyncHistory
 } from '../db/stores/syncHistory'
+import {
+  createSyncSession,
+  getSyncSessionById,
+  getInterruptedSession,
+  getRunningSession,
+  markDocCompleted,
+  updateSyncSessionStatus,
+  getCompletedDocIds,
+  markRunningSessonsAsInterrupted
+} from '../db/stores/syncSessions'
 import { getAppSettings } from '../db/stores/settings'
 import type { Document, ChangeSet, SyncProgress, SyncResult, SyncOptions } from '../ipc/types'
 import type { DocumentRecord } from '../db/stores/types'
+import { processDocumentImages } from './imageProcessor'
+import { processDocumentAttachments } from './attachmentProcessor'
 
 // Yuque API configuration
 const YUQUE_CONFIG = {
@@ -35,9 +47,23 @@ const YUQUE_CONFIG = {
 let isSyncing = false
 let shouldCancel = false
 let currentSyncHistoryId: number | null = null
+let currentSyncSessionId: number | null = null
 
 // Progress callback type
 type ProgressCallback = (progress: SyncProgress) => void
+
+/**
+ * Sync session info for resume functionality
+ */
+export interface SyncSessionInfo {
+  id: number
+  bookIds: string[]
+  totalDocs: number
+  completedDocIds: string[]
+  status: 'running' | 'interrupted' | 'completed'
+  startedAt: string
+  updatedAt: string
+}
 
 /**
  * Compare timestamps to determine if remote is newer
@@ -289,7 +315,8 @@ function setFileTimestamps(filePath: string, createdAt: string, updatedAt: strin
 export function getSyncStatus() {
   return {
     isRunning: isSyncing,
-    currentSyncHistoryId
+    currentSyncHistoryId,
+    currentSyncSessionId
   }
 }
 
@@ -302,7 +329,45 @@ export function cancelSync(): void {
     if (currentSyncHistoryId) {
       cancelSyncHistory(currentSyncHistoryId)
     }
+    // Mark current session as interrupted
+    if (currentSyncSessionId) {
+      updateSyncSessionStatus(currentSyncSessionId, 'interrupted')
+    }
   }
+}
+
+/**
+ * Get interrupted sync session if any
+ * Requirements: 6.3, 6.4
+ */
+export function getInterruptedSyncSession(): SyncSessionInfo | null {
+  const session = getInterruptedSession()
+  if (!session) return null
+  
+  return {
+    id: session.id,
+    bookIds: JSON.parse(session.book_ids),
+    totalDocs: session.total_docs,
+    completedDocIds: JSON.parse(session.completed_doc_ids),
+    status: session.status,
+    startedAt: session.started_at,
+    updatedAt: session.updated_at
+  }
+}
+
+/**
+ * Mark all running sessions as interrupted (called on app startup)
+ * Requirements: 6.2
+ */
+export function markRunningSessionsAsInterrupted(): number {
+  return markRunningSessonsAsInterrupted()
+}
+
+/**
+ * Delete/clear an interrupted session
+ */
+export function clearInterruptedSession(sessionId: number): void {
+  updateSyncSessionStatus(sessionId, 'completed')
 }
 
 /**
@@ -470,9 +535,57 @@ export async function startSync(
         const sanitizedTitle = doc.title.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
         const sanitizedBookName = bookInfo.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
         const filePath = path.join(syncDirectory, sanitizedBookName, `${sanitizedTitle}.md`)
+        const docDir = path.dirname(filePath)
+
+        // Process images in the document content
+        // Requirements: 1.1, 1.2, 1.3, 1.7
+        let processedContent = content
+        try {
+          processedContent = await processDocumentImages(
+            content,
+            doc.id,
+            docDir,
+            (imgCurrent, imgTotal) => {
+              if (onProgress) {
+                onProgress({
+                  current: i,
+                  total: totalDocs,
+                  currentDoc: `${doc.title} (图片 ${imgCurrent}/${imgTotal})`,
+                  status: 'writing'
+                })
+              }
+            }
+          )
+        } catch (imgError) {
+          // Log image processing error but continue with original content
+          console.error(`[startSync] Image processing failed for ${doc.title}:`, imgError)
+        }
+
+        // Process attachments in the document content
+        // Requirements: 2.1, 2.2, 2.3
+        try {
+          processedContent = await processDocumentAttachments(
+            processedContent,
+            doc.id,
+            docDir,
+            (attCurrent, attTotal) => {
+              if (onProgress) {
+                onProgress({
+                  current: i,
+                  total: totalDocs,
+                  currentDoc: `${doc.title} (附件 ${attCurrent}/${attTotal})`,
+                  status: 'writing'
+                })
+              }
+            }
+          )
+        } catch (attError) {
+          // Log attachment processing error but continue with current content
+          console.error(`[startSync] Attachment processing failed for ${doc.title}:`, attError)
+        }
 
         // Write to file
-        writeDocumentToFile(filePath, content)
+        writeDocumentToFile(filePath, processedContent)
 
         // Set file timestamps to match remote Yuque timestamps
         const createdAt = doc.remoteCreatedAt || doc.remoteUpdatedAt

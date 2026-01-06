@@ -7,7 +7,7 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
-import { CREATE_TABLES_SQL, SCHEMA_VERSION, DEFAULT_SETTINGS, MIGRATION_V3_SQL } from './schema'
+import { CREATE_TABLES_SQL, SCHEMA_VERSION, DEFAULT_SETTINGS, MIGRATION_V3_SQL, MIGRATION_V4_SQL } from './schema'
 
 let db: Database.Database | null = null
 
@@ -105,6 +105,14 @@ function runMigrations(database: Database.Database): void {
         } catch (error) {
           console.error('Migration v3 failed:', error)
           // If migration fails, the table might already have the new schema
+        }
+      }
+      if (currentVersion < 4) {
+        console.log('Running migration to v4: adding sync_sessions and resources tables')
+        try {
+          database.exec(MIGRATION_V4_SQL)
+        } catch (error) {
+          console.error('Migration v4 failed:', error)
         }
       }
     }
