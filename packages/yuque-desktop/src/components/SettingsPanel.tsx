@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useSettings, useTheme, useToast } from '../hooks'
+import { useSettings, useTheme, useToast, useSync, useBooks } from '../hooks'
 import type { AppSettings } from '../hooks'
 import { MacButton } from './ui/MacButton'
 import { MacSwitch } from './ui/MacSwitch'
 import { MacToolbar, ToolbarTitle } from './ui/MacToolbar'
+import { useSyncStore } from '../stores/syncStore'
+import { useBooksStore } from '../stores/booksStore'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -14,6 +16,10 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
   const { getSettings, setSettings, selectDirectory } = useSettings()
   const { setTheme } = useTheme()
   const { showToast } = useToast()
+  const { startSync } = useSync()
+  const { listBooks } = useBooks()
+  const { isRunning, setRunning, setProgress } = useSyncStore()
+  const { books, setBooks } = useBooksStore()
   
   const [settings, setLocalSettings] = useState<AppSettings>({
     syncDirectory: '',
@@ -23,6 +29,7 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
     autoSyncInterval: 0
   })
   const [loading, setLoading] = useState(true)
+  const [isForceSyncing, setIsForceSyncing] = useState(false)
 
   // Load settings
   useEffect(() => {
@@ -60,6 +67,58 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
       onLogout()
     }
   }, [onLogout])
+
+  // Handle force sync all books
+  const handleForceSyncAll = useCallback(async () => {
+    if (isRunning || isForceSyncing) {
+      showToast('warning', '同步正在进行中')
+      return
+    }
+
+    if (!settings.syncDirectory) {
+      showToast('error', '请先设置同步目录')
+      return
+    }
+
+    if (!confirm('确定要强制同步所有知识库吗？这可能需要较长时间。')) {
+      return
+    }
+
+    setIsForceSyncing(true)
+    setRunning(true)
+
+    try {
+      // Fetch all books if not loaded
+      let allBooks = books
+      if (allBooks.length === 0) {
+        allBooks = await listBooks()
+        setBooks(allBooks)
+      }
+
+      if (allBooks.length === 0) {
+        showToast('error', '没有找到知识库')
+        return
+      }
+
+      const allBookIds = allBooks.map(b => b.id)
+      showToast('info', `开始强制同步 ${allBooks.length} 个知识库...`)
+
+      const result = await startSync({ bookIds: allBookIds, force: true })
+
+      if (result.success) {
+        showToast('success', `同步完成！共同步 ${result.syncedDocs} 个文档`)
+      } else {
+        showToast('error', `同步完成，但有 ${result.failedDocs} 个文档失败`)
+      }
+    } catch (error) {
+      console.error('Force sync all failed:', error)
+      showToast('error', '同步失败，请重试')
+    } finally {
+      setIsForceSyncing(false)
+      setRunning(false)
+      setProgress(null)
+    }
+  }, [isRunning, isForceSyncing, settings.syncDirectory, books, listBooks, setBooks, startSync, setRunning, setProgress, showToast])
 
   if (loading) {
     return (
@@ -117,6 +176,26 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                 </select>
                 <p className="mt-1 text-xs text-text-tertiary">
                   开启后将按设定间隔自动同步所有知识库
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">全局强制同步</label>
+                <MacButton 
+                  variant="secondary" 
+                  onClick={handleForceSyncAll}
+                  disabled={isRunning || isForceSyncing || !settings.syncDirectory}
+                >
+                  {isForceSyncing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      同步中...
+                    </>
+                  ) : (
+                    '强制同步所有知识库'
+                  )}
+                </MacButton>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  重新下载所有知识库的所有文档，包括图片和附件
                 </p>
               </div>
             </div>
