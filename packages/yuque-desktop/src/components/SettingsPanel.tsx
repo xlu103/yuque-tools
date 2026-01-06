@@ -6,6 +6,7 @@ import { MacSwitch } from './ui/MacSwitch'
 import { MacToolbar, ToolbarTitle } from './ui/MacToolbar'
 import { useSyncStore } from '../stores/syncStore'
 import { useBooksStore } from '../stores/booksStore'
+import { FailedDocsPanel } from './FailedDocsPanel'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -30,6 +31,7 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
   })
   const [loading, setLoading] = useState(true)
   const [isForceSyncing, setIsForceSyncing] = useState(false)
+  const [showFailedDocs, setShowFailedDocs] = useState(false)
 
   // Load settings
   useEffect(() => {
@@ -128,6 +130,10 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
     )
   }
 
+  if (showFailedDocs) {
+    return <FailedDocsPanel onClose={() => setShowFailedDocs(false)} />
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col bg-bg-primary">
       {/* Toolbar - add left padding for macOS traffic lights */}
@@ -196,6 +202,18 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                 </MacButton>
                 <p className="mt-1 text-xs text-text-tertiary">
                   重新下载所有知识库的所有文档，包括图片和附件
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">失败文档管理</label>
+                <MacButton 
+                  variant="secondary" 
+                  onClick={() => setShowFailedDocs(true)}
+                >
+                  查看失败文档
+                </MacButton>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  管理同步失败的文档，可重试或忽略
                 </p>
               </div>
             </div>
