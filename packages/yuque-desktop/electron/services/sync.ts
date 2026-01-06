@@ -115,6 +115,7 @@ export function detectChanges(
       slug: remoteDoc.slug,
       title: remoteDoc.title,
       localPath: localDoc?.local_path || undefined,
+      remoteCreatedAt: remoteDoc.remoteCreatedAt,
       remoteUpdatedAt: remoteDoc.remoteUpdatedAt,
       localSyncedAt: localDoc?.local_synced_at || undefined,
       syncStatus: status
@@ -203,6 +204,7 @@ async function fetchRemoteDocs(bookId: string): Promise<Document[]> {
     bookId: bookId,
     slug: doc.slug,
     title: doc.title,
+    remoteCreatedAt: doc.created_at || doc.updated_at || new Date().toISOString(),
     remoteUpdatedAt: doc.content_updated_at || doc.updated_at || new Date().toISOString(),
     syncStatus: 'new' as const
   }))
@@ -248,6 +250,24 @@ function writeDocumentToFile(filePath: string, content: string): void {
     fs.mkdirSync(dir, { recursive: true })
   }
   fs.writeFileSync(filePath, content, 'utf-8')
+}
+
+/**
+ * Set file timestamps to match remote Yuque timestamps
+ * @param filePath - Path to the file
+ * @param createdAt - Remote creation time (ISO string)
+ * @param updatedAt - Remote update time (ISO string)
+ */
+function setFileTimestamps(filePath: string, createdAt: string, updatedAt: string): void {
+  try {
+    const mtime = new Date(updatedAt)
+    const atime = new Date(createdAt)
+    
+    // Use utimesSync to set access time and modification time
+    fs.utimesSync(filePath, atime, mtime)
+  } catch (error) {
+    console.error(`Failed to set timestamps for ${filePath}:`, error)
+  }
 }
 
 /**
@@ -428,6 +448,10 @@ export async function startSync(
 
         // Write to file
         writeDocumentToFile(filePath, content)
+
+        // Set file timestamps to match remote Yuque timestamps
+        const createdAt = doc.remoteCreatedAt || doc.remoteUpdatedAt
+        setFileTimestamps(filePath, createdAt, doc.remoteUpdatedAt)
 
         // Update Meta Store
         const now = new Date().toISOString()

@@ -52,6 +52,7 @@ interface YuqueDocItem {
   slug: string
   title: string
   description?: string
+  created_at?: string
   content_updated_at?: string
   updated_at?: string
 }
@@ -150,6 +151,7 @@ export async function getDocsOfBook(bookId: string): Promise<Document[]> {
     bookId: bookId,
     slug: doc.slug,
     title: doc.title,
+    remoteCreatedAt: doc.created_at || doc.updated_at || new Date().toISOString(),
     remoteUpdatedAt: doc.content_updated_at || doc.updated_at || new Date().toISOString(),
     syncStatus: 'new' as const
   }))

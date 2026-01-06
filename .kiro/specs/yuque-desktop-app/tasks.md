@@ -255,9 +255,29 @@
 - [x] 18. Final Checkpoint
   - 确保所有测试通过，如有问题请询问用户
 
+- [x] 19. 新功能：全局同步和文件时间戳
+  - [x] 19.1 实现全局同步功能
+    - 在工具栏添加"全局同步"按钮
+    - 同步所有知识库的文档
+    - _Requirements: 6.2_
+
+  - [x] 19.2 实现文件时间戳同步
+    - 同步文件时设置创建时间和修改时间为语雀远程时间
+    - 使用 utimes 设置文件的 mtime 和 atime
+    - _Requirements: 4.2_
+
+- [ ] 20. 测试框架搭建（可选）
+  - [ ] 20.1 安装和配置 fast-check 测试框架
+    - 安装 fast-check 和 vitest
+    - 配置测试脚本
+    - 创建测试目录结构
+    - _Requirements: 测试基础设施_
+
 ## Notes
 
 - Tasks marked with `*` are optional property-based tests
 - 复用 yuque-tools-cli 的核心 API 逻辑，避免重复实现
-- macOS 风格组件基于 Radix UI Primitives 自定义样式
-- 使用 fast-check 进行 property-based testing
+- macOS 风格组件基于 Tailwind CSS 自定义样式
+- 使用 fast-check 进行 property-based testing（需要先完成 19.1）
+- 所有核心功能已实现完成，剩余任务为可选的 property-based 测试
+

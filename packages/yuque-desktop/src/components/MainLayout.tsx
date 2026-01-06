@@ -120,7 +120,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       setProgress(null)
       if (result.success) {
         showToast('success', `同步完成: ${result.syncedDocs} 个文档`)
-        // Refresh documents
+        // Refresh current book documents
         if (selectedBookId) {
           loadDocuments(selectedBookId)
         }
@@ -150,6 +150,23 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       showToast('error', '启动同步失败')
     }
   }, [selectedBookId, startSync, setRunning, showToast])
+
+  // Handle global sync (sync all books)
+  const handleGlobalSync = useCallback(async (force = false) => {
+    if (books.length === 0) {
+      showToast('warning', '没有可同步的知识库')
+      return
+    }
+
+    setRunning(true)
+    try {
+      const allBookIds = books.map(b => b.id)
+      await startSync({ bookIds: allBookIds, force })
+    } catch (error) {
+      setRunning(false)
+      showToast('error', '启动全局同步失败')
+    }
+  }, [books, startSync, setRunning, showToast])
 
   // Handle cancel sync
   const handleCancelSync = useCallback(async () => {
@@ -293,14 +310,25 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                   size="sm" 
                   onClick={() => handleSync(false)}
                   disabled={!selectedBookId}
+                  title="同步当前知识库"
                 >
                   同步
+                </MacButton>
+                <MacButton 
+                  variant="secondary" 
+                  size="sm" 
+                  onClick={() => handleGlobalSync(false)}
+                  disabled={books.length === 0}
+                  title="同步所有知识库"
+                >
+                  全局同步
                 </MacButton>
                 <MacButton 
                   variant="ghost" 
                   size="sm" 
                   onClick={() => handleSync(true)}
                   disabled={!selectedBookId}
+                  title="强制重新下载当前知识库所有文档"
                 >
                   强制同步
                 </MacButton>

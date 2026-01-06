@@ -34,6 +34,7 @@ export interface Document {
   slug: string
   title: string
   localPath?: string
+  remoteCreatedAt?: string
   remoteUpdatedAt: string
   localSyncedAt?: string
   syncStatus: 'synced' | 'pending' | 'modified' | 'new' | 'deleted'
