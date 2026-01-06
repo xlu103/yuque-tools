@@ -4,11 +4,19 @@
   "private": true,
   "description": "🧰 玩转语雀-朴实无华的语雀工具集合，语雀知识库批量导出工具(无需Token)｜浏览器插件助手",
   "scripts": {
-    "tsc": "pnpm --filter=yuque-tools run tsc"
+    "tsc": "pnpm --filter=yuque-tools run tsc",
+    "desktop:dev": "pnpm --filter=yuque-desktop run dev"
   },
   "author": "vannvan",
   "license": "MIT",
   "devDependencies": {
     "pnpm": "^8.10.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "electron",
+      "esbuild"
+    ]
   }
 }

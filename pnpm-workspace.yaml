@@ -1,6 +1,7 @@
 packages:
-  - 'packages/**'
-  - 'test/**'
-  # exclude
+  - packages/**
+  - test/**
   - '!**/__test__/**'
   - '!**/example/**'
+
+onlyBuiltDependencies: better-sqlite3 electron esbuild
