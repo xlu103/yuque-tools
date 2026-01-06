@@ -208,11 +208,12 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
     
     // Build book info map for sync
     const books = getAllBooks()
-    const bookInfoMap = new Map<string, { userLogin: string; slug: string }>()
+    const bookInfoMap = new Map<string, { userLogin: string; slug: string; name: string }>()
     for (const book of books) {
       bookInfoMap.set(book.id, {
         userLogin: book.user_login,
-        slug: book.slug
+        slug: book.slug,
+        name: book.name
       })
     }
 

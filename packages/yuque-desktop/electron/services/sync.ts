@@ -278,7 +278,7 @@ export function cancelSync(): void {
  */
 export async function startSync(
   options: SyncOptions,
-  bookInfoMap: Map<string, { userLogin: string; slug: string }>,
+  bookInfoMap: Map<string, { userLogin: string; slug: string; name: string }>,
   onProgress?: ProgressCallback
 ): Promise<SyncResult> {
   if (isSyncing) {
@@ -421,9 +421,10 @@ export async function startSync(
           })
         }
 
-        // Sanitize filename
+        // Sanitize filenames
         const sanitizedTitle = doc.title.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
-        const filePath = path.join(syncDirectory, bookInfo.slug, `${sanitizedTitle}.md`)
+        const sanitizedBookName = bookInfo.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+        const filePath = path.join(syncDirectory, sanitizedBookName, `${sanitizedTitle}.md`)
 
         // Write to file
         writeDocumentToFile(filePath, content)
