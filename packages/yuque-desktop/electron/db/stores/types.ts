@@ -39,7 +39,7 @@ export interface DocumentRecord {
   local_path: string | null
   remote_updated_at: string | null
   local_synced_at: string | null
-  sync_status: 'synced' | 'pending' | 'modified' | 'new' | 'deleted'
+  sync_status: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed'
   created_at: string
   updated_at: string
 }
@@ -52,14 +52,14 @@ export interface DocumentInput {
   localPath?: string
   remoteUpdatedAt?: string
   localSyncedAt?: string
-  syncStatus?: 'synced' | 'pending' | 'modified' | 'new' | 'deleted'
+  syncStatus?: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed'
 }
 
 export interface DocumentUpdate {
   localPath?: string
   remoteUpdatedAt?: string
   localSyncedAt?: string
-  syncStatus?: 'synced' | 'pending' | 'modified' | 'new' | 'deleted'
+  syncStatus?: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed'
 }
 
 // ============================================

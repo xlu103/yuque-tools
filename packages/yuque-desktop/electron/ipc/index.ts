@@ -127,14 +127,23 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       const existingDocs = getDocumentsByBookId(bookId)
       const existingDocsMap = new Map(existingDocs.map((d) => [d.id, d]))
       
+      // Log existing failed documents
+      const failedDocs = existingDocs.filter(d => d.sync_status === 'failed')
+      console.log(`[books:getDocs] Found ${failedDocs.length} failed documents in local DB:`, 
+        failedDocs.map(d => ({ id: d.id, title: d.title, status: d.sync_status })))
+      
       // Prepare document inputs, preserving existing sync status where applicable
       const docInputs: DocumentInput[] = docs.map((doc) => {
         const existing = existingDocsMap.get(doc.id)
-        let syncStatus: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' = 'new'
+        let syncStatus: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed' = 'new'
         
         if (existing) {
           // Document exists locally
-          if (existing.sync_status === 'synced') {
+          if (existing.sync_status === 'failed') {
+            // Preserve failed status - don't retry automatically
+            syncStatus = 'failed'
+            console.log(`[books:getDocs] Preserving failed status for doc: ${doc.title} (id: ${doc.id})`)
+          } else if (existing.sync_status === 'synced') {
             // Check if remote has been updated
             const remoteTime = new Date(doc.remoteUpdatedAt).getTime()
             const localTime = existing.local_synced_at 
@@ -158,6 +167,13 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
           syncStatus
         }
       })
+      
+      // Log status summary before upsert
+      const statusSummary = docInputs.reduce((acc, d) => {
+        acc[d.syncStatus || 'unknown'] = (acc[d.syncStatus || 'unknown'] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+      console.log(`[books:getDocs] Status summary before upsert:`, statusSummary)
       
       // Store in Meta Store
       upsertDocuments(docInputs)

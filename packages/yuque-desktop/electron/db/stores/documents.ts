@@ -88,6 +88,14 @@ export function upsertDocument(doc: DocumentInput): void {
  */
 export function upsertDocuments(docs: DocumentInput[]): void {
   const db = getDatabase()
+  
+  // Log documents with failed status being upserted
+  const failedDocs = docs.filter(d => d.syncStatus === 'failed')
+  if (failedDocs.length > 0) {
+    console.log(`[upsertDocuments] Upserting ${failedDocs.length} docs with failed status:`, 
+      failedDocs.map(d => ({ id: d.id, title: d.title, status: d.syncStatus })))
+  }
+  
   const upsert = db.prepare(`
     INSERT INTO documents (id, book_id, slug, title, local_path, remote_updated_at, local_synced_at, sync_status, updated_at)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
@@ -154,7 +162,7 @@ export function updateDocument(id: string, update: DocumentUpdate): void {
  */
 export function updateDocumentSyncStatus(
   id: string,
-  status: 'synced' | 'pending' | 'modified' | 'new' | 'deleted',
+  status: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed',
   localSyncedAt?: string
 ): void {
   const db = getDatabase()

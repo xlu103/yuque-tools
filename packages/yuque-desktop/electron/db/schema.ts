@@ -3,7 +3,7 @@
  * SQLite schema for Meta Store - stores document metadata, sync history, and settings
  */
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 /**
  * SQL statements to create all tables
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS documents (
   local_path TEXT,
   remote_updated_at TEXT,
   local_synced_at TEXT,
-  sync_status TEXT DEFAULT 'pending' CHECK(sync_status IN ('synced', 'pending', 'modified', 'new', 'deleted')),
+  sync_status TEXT DEFAULT 'pending' CHECK(sync_status IN ('synced', 'pending', 'modified', 'new', 'deleted', 'failed')),
   created_at TEXT DEFAULT (datetime('now')),
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
@@ -78,11 +78,48 @@ CREATE TABLE IF NOT EXISTS auth_session (
 `
 
 /**
+ * Migration SQL for version 3: Add 'failed' status to documents
+ */
+export const MIGRATION_V3_SQL = `
+-- SQLite doesn't support ALTER TABLE to modify CHECK constraints
+-- We need to recreate the table with the new constraint
+
+-- Create new table with updated constraint
+CREATE TABLE IF NOT EXISTS documents_new (
+  id TEXT PRIMARY KEY,
+  book_id TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  title TEXT NOT NULL,
+  local_path TEXT,
+  remote_updated_at TEXT,
+  local_synced_at TEXT,
+  sync_status TEXT DEFAULT 'pending' CHECK(sync_status IN ('synced', 'pending', 'modified', 'new', 'deleted', 'failed')),
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
+);
+
+-- Copy data from old table
+INSERT INTO documents_new SELECT * FROM documents;
+
+-- Drop old table
+DROP TABLE documents;
+
+-- Rename new table
+ALTER TABLE documents_new RENAME TO documents;
+
+-- Recreate indexes
+CREATE INDEX IF NOT EXISTS idx_documents_book_id ON documents(book_id);
+CREATE INDEX IF NOT EXISTS idx_documents_sync_status ON documents(sync_status);
+`
+
+/**
  * Default settings to initialize
  */
 export const DEFAULT_SETTINGS: Record<string, string> = {
   syncDirectory: '',
   linebreak: 'true',
   latexcode: 'false',
-  theme: 'system'
+  theme: 'system',
+  autoSyncInterval: '0'
 }

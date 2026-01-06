@@ -59,32 +59,45 @@ export function isRemoteNewer(remoteUpdatedAt: string, localSyncedAt: string | n
 export function determineSyncStatus(
   remoteDoc: { id: string; remoteUpdatedAt: string },
   localDoc: DocumentRecord | undefined
-): 'new' | 'modified' | 'synced' {
+): 'new' | 'modified' | 'synced' | 'failed' {
   // Document doesn't exist locally - it's new
   if (!localDoc) {
+    console.log(`[determineSyncStatus] Doc ${remoteDoc.id}: no local doc, status = new`)
     return 'new'
+  }
+
+  // If document previously failed, keep it as failed (skip in incremental sync)
+  if (localDoc.sync_status === 'failed') {
+    console.log(`[determineSyncStatus] Doc ${remoteDoc.id} (${localDoc.title}): local status is failed, keeping as failed`)
+    return 'failed'
   }
 
   // Document exists locally - check if modified
   if (localDoc.sync_status === 'synced') {
     // Check if remote has been updated since last sync
     if (isRemoteNewer(remoteDoc.remoteUpdatedAt, localDoc.local_synced_at)) {
+      console.log(`[determineSyncStatus] Doc ${remoteDoc.id} (${localDoc.title}): remote newer, status = modified`)
       return 'modified'
     }
+    console.log(`[determineSyncStatus] Doc ${remoteDoc.id} (${localDoc.title}): already synced`)
     return 'synced'
   }
 
   // If local status is 'new', 'pending', or 'modified', keep checking remote
   if (isRemoteNewer(remoteDoc.remoteUpdatedAt, localDoc.local_synced_at)) {
+    console.log(`[determineSyncStatus] Doc ${remoteDoc.id} (${localDoc.title}): remote newer, status = modified`)
     return 'modified'
   }
 
   // If local is 'new' but remote hasn't changed, it's still new
   if (localDoc.sync_status === 'new') {
+    console.log(`[determineSyncStatus] Doc ${remoteDoc.id} (${localDoc.title}): local status is new, keeping as new`)
     return 'new'
   }
 
-  return localDoc.sync_status === 'deleted' ? 'synced' : (localDoc.sync_status as 'synced' | 'modified')
+  const finalStatus = localDoc.sync_status === 'deleted' ? 'synced' : (localDoc.sync_status as 'synced' | 'modified')
+  console.log(`[determineSyncStatus] Doc ${remoteDoc.id} (${localDoc.title}): fallback, local_status=${localDoc.sync_status}, final=${finalStatus}`)
+  return finalStatus
 }
 
 /**
@@ -338,14 +351,20 @@ export async function startSync(
 
     // Detect changes
     const changes = await getChangesForBooks(bookIds)
+    
+    console.log(`[startSync] Changes detected - new: ${changes.new.length}, modified: ${changes.modified.length}, deleted: ${changes.deleted.length}`)
+    console.log(`[startSync] New docs:`, changes.new.map(d => ({ id: d.id, title: d.title, status: d.syncStatus })))
+    console.log(`[startSync] Modified docs:`, changes.modified.map(d => ({ id: d.id, title: d.title, status: d.syncStatus })))
 
     // Determine which documents to sync
     let docsToSync: Document[] = []
 
     if (options.force) {
-      // Force sync: re-download all documents
+      console.log(`[startSync] Force sync mode - including all documents`)
+      // Force sync: re-download all documents (including failed ones)
       for (const bookId of bookIds) {
         const localDocs = getDocumentsByBookId(bookId)
+        console.log(`[startSync] Book ${bookId} local docs:`, localDocs.map(d => ({ id: d.id, title: d.title, status: d.sync_status })))
         for (const doc of localDocs) {
           if (doc.sync_status !== 'deleted') {
             docsToSync.push({
@@ -371,17 +390,23 @@ export async function startSync(
         return true
       })
     } else {
-      // Incremental sync: only new and modified documents
-      docsToSync = [...changes.new, ...changes.modified]
+      console.log(`[startSync] Incremental sync mode - filtering out failed docs`)
+      // Incremental sync: only new and modified documents (skip failed ones)
+      const allDocs = [...changes.new, ...changes.modified]
+      console.log(`[startSync] All docs before filter:`, allDocs.map(d => ({ id: d.id, title: d.title, status: d.syncStatus })))
+      docsToSync = allDocs.filter(d => d.syncStatus !== 'failed')
+      console.log(`[startSync] Docs after filtering failed:`, docsToSync.map(d => ({ id: d.id, title: d.title, status: d.syncStatus })))
     }
 
     // Filter by specific document IDs if provided
     if (options.documentIds && options.documentIds.length > 0) {
+      console.log(`[startSync] Filtering by specific document IDs:`, options.documentIds)
       const docIdSet = new Set(options.documentIds)
       docsToSync = docsToSync.filter(d => docIdSet.has(d.id))
     }
 
     const totalDocs = docsToSync.length
+    console.log(`[startSync] Final docsToSync count: ${totalDocs}`)
 
     // Create sync history record
     // Requirements: 7.1
@@ -476,6 +501,22 @@ export async function startSync(
         const errorMsg = error instanceof Error ? error.message : String(error)
         errors.push(`下载失败 [${doc.title}]: ${errorMsg}`)
         failedDocs++
+
+        // Mark document as failed so it won't be synced again
+        // Use upsertDocument instead of updateDocumentSyncStatus to ensure the document exists in DB
+        console.log(`[startSync] Marking doc as failed: ${doc.title} (id: ${doc.id}), error: ${errorMsg}`)
+        upsertDocument({
+          id: doc.id,
+          bookId: doc.bookId,
+          slug: doc.slug,
+          title: doc.title,
+          remoteUpdatedAt: doc.remoteUpdatedAt,
+          syncStatus: 'failed'
+        })
+        
+        // Verify the status was updated
+        const updatedDoc = getDocumentsByBookId(doc.bookId).find(d => d.id === doc.id)
+        console.log(`[startSync] After marking failed, doc status in DB: ${updatedDoc?.sync_status}`)
 
         // Update failed count in history
         if (currentSyncHistoryId) {

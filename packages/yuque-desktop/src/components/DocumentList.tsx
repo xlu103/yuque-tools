@@ -16,7 +16,8 @@ const statusConfig = {
   pending: { label: '待同步', color: 'text-warning', bg: 'bg-warning/10' },
   modified: { label: '已修改', color: 'text-info', bg: 'bg-info/10' },
   new: { label: '新增', color: 'text-accent', bg: 'bg-accent/10' },
-  deleted: { label: '已删除', color: 'text-error', bg: 'bg-error/10' }
+  deleted: { label: '已删除', color: 'text-error', bg: 'bg-error/10' },
+  failed: { label: '同步失败', color: 'text-error', bg: 'bg-error/10' }
 }
 
 export function DocumentList({ 

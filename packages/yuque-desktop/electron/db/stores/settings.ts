@@ -61,7 +61,8 @@ export function getAppSettings(): AppSettings {
     syncDirectory: settings.syncDirectory ?? '',
     linebreak: settings.linebreak === 'true',
     latexcode: settings.latexcode === 'true',
-    theme: (settings.theme as AppSettings['theme']) ?? 'system'
+    theme: (settings.theme as AppSettings['theme']) ?? 'system',
+    autoSyncInterval: settings.autoSyncInterval ? parseInt(settings.autoSyncInterval, 10) as AppSettings['autoSyncInterval'] : 0
   }
 }
 
@@ -99,6 +100,9 @@ export function saveAppSettings(settings: Partial<AppSettings>): void {
   if (settings.theme !== undefined) {
     entries.push(['theme', settings.theme])
   }
+  if (settings.autoSyncInterval !== undefined) {
+    entries.push(['autoSyncInterval', String(settings.autoSyncInterval)])
+  }
 
   if (entries.length > 0) {
     saveMany(entries)
@@ -117,7 +121,8 @@ export function resetSettings(): void {
     ['syncDirectory', ''],
     ['linebreak', 'true'],
     ['latexcode', 'false'],
-    ['theme', 'system']
+    ['theme', 'system'],
+    ['autoSyncInterval', '0']
   ]
 
   const insert = db.prepare('INSERT INTO settings (key, value) VALUES (?, ?)')

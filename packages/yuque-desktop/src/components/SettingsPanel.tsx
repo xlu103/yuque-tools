@@ -19,7 +19,8 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
     syncDirectory: '',
     linebreak: true,
     latexcode: false,
-    theme: 'system'
+    theme: 'system',
+    autoSyncInterval: 0
   })
   const [loading, setLoading] = useState(true)
 
@@ -100,6 +101,23 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                     选择
                   </MacButton>
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">自动同步</label>
+                <select
+                  value={settings.autoSyncInterval}
+                  onChange={(e) => handleSettingChange('autoSyncInterval', parseInt(e.target.value, 10))}
+                  className="w-full px-3 py-2 bg-bg-primary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value={0}>关闭</option>
+                  <option value={30}>每 30 分钟</option>
+                  <option value={60}>每 1 小时</option>
+                  <option value={720}>每 12 小时</option>
+                  <option value={1440}>每 24 小时</option>
+                </select>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  开启后将按设定间隔自动同步所有知识库
+                </p>
               </div>
             </div>
           </section>

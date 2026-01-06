@@ -7,7 +7,7 @@ import Database from 'better-sqlite3'
 import { app } from 'electron'
 import { join } from 'path'
 import { existsSync, mkdirSync } from 'fs'
-import { CREATE_TABLES_SQL, SCHEMA_VERSION, DEFAULT_SETTINGS } from './schema'
+import { CREATE_TABLES_SQL, SCHEMA_VERSION, DEFAULT_SETTINGS, MIGRATION_V3_SQL } from './schema'
 
 let db: Database.Database | null = null
 
@@ -91,10 +91,23 @@ function runMigrations(database: Database.Database): void {
   console.log('Current schema version:', currentVersion)
 
   if (currentVersion < SCHEMA_VERSION) {
-    console.log('Running migrations to version:', SCHEMA_VERSION)
+    console.log('Running migrations from version', currentVersion, 'to', SCHEMA_VERSION)
     
-    // Run all table creation in a transaction
-    database.exec(CREATE_TABLES_SQL)
+    // For fresh install, run all table creation
+    if (currentVersion === 0) {
+      database.exec(CREATE_TABLES_SQL)
+    } else {
+      // Run incremental migrations
+      if (currentVersion < 3) {
+        console.log('Running migration to v3: adding failed status')
+        try {
+          database.exec(MIGRATION_V3_SQL)
+        } catch (error) {
+          console.error('Migration v3 failed:', error)
+          // If migration fails, the table might already have the new schema
+        }
+      }
+    }
     
     // Initialize default settings if not exists
     initializeDefaultSettings(database)

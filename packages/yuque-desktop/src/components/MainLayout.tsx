@@ -1,5 +1,5 @@
-import { useEffect, useCallback, useState } from 'react'
-import { useBooks, useSync, useSyncEvents, useToast, useIsElectron } from '../hooks'
+import { useEffect, useCallback, useState, useRef } from 'react'
+import { useBooks, useSync, useSyncEvents, useToast, useIsElectron, useSettings } from '../hooks'
 import type { Session, SyncProgress } from '../hooks'
 import { useBooksStore, useSyncStore } from '../stores'
 import { MacSidebar, SidebarSection, SidebarItem } from './ui/MacSidebar'
@@ -20,6 +20,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const isElectron = useIsElectron()
   const { listBooks, getBookDocs } = useBooks()
   const { startSync, cancelSync } = useSync()
+  const { getSettings } = useSettings()
   const { showToast } = useToast()
   
   const { 
@@ -45,6 +46,10 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  
+  // Auto sync timer ref
+  const autoSyncTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const autoSyncIntervalRef = useRef<number>(0)
 
   // Keyboard shortcut handlers
   useEffect(() => {
@@ -71,6 +76,91 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   useEffect(() => {
     loadBooks()
   }, [])
+
+  // Auto sync setup
+  useEffect(() => {
+    const setupAutoSync = async () => {
+      try {
+        const settings = await getSettings()
+        const interval = settings.autoSyncInterval || 0
+        
+        // Clear existing timer
+        if (autoSyncTimerRef.current) {
+          clearInterval(autoSyncTimerRef.current)
+          autoSyncTimerRef.current = null
+        }
+        
+        autoSyncIntervalRef.current = interval
+        
+        if (interval > 0) {
+          // Set up new timer (interval is in minutes, convert to ms)
+          autoSyncTimerRef.current = setInterval(() => {
+            // Only auto sync if not already syncing
+            if (!isRunning && books.length > 0) {
+              console.log('Auto sync triggered')
+              const allBookIds = books.map(b => b.id)
+              startSync({ bookIds: allBookIds, force: false })
+                .then(() => setRunning(true))
+                .catch(console.error)
+            }
+          }, interval * 60 * 1000)
+          
+          console.log(`Auto sync enabled: every ${interval} minutes`)
+        }
+      } catch (error) {
+        console.error('Failed to setup auto sync:', error)
+      }
+    }
+    
+    setupAutoSync()
+    
+    return () => {
+      if (autoSyncTimerRef.current) {
+        clearInterval(autoSyncTimerRef.current)
+      }
+    }
+  }, [getSettings, books, isRunning, startSync, setRunning])
+
+  // Reload auto sync settings when returning from settings panel
+  useEffect(() => {
+    if (!showSettings) {
+      // Settings panel closed, check if auto sync interval changed
+      const checkAutoSyncSettings = async () => {
+        try {
+          const settings = await getSettings()
+          const newInterval = settings.autoSyncInterval || 0
+          
+          if (newInterval !== autoSyncIntervalRef.current) {
+            // Interval changed, clear and reset timer
+            if (autoSyncTimerRef.current) {
+              clearInterval(autoSyncTimerRef.current)
+              autoSyncTimerRef.current = null
+            }
+            
+            autoSyncIntervalRef.current = newInterval
+            
+            if (newInterval > 0 && books.length > 0) {
+              autoSyncTimerRef.current = setInterval(() => {
+                if (!isRunning) {
+                  console.log('Auto sync triggered')
+                  const allBookIds = books.map(b => b.id)
+                  startSync({ bookIds: allBookIds, force: false })
+                    .then(() => setRunning(true))
+                    .catch(console.error)
+                }
+              }, newInterval * 60 * 1000)
+              
+              console.log(`Auto sync updated: every ${newInterval} minutes`)
+            }
+          }
+        } catch (error) {
+          console.error('Failed to check auto sync settings:', error)
+        }
+      }
+      
+      checkAutoSyncSettings()
+    }
+  }, [showSettings, getSettings, books, isRunning, startSync, setRunning])
 
   const loadBooks = useCallback(async () => {
     setLoadingBooks(true)
@@ -291,6 +381,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
               <option value="modified">已修改 ({statusCounts.modified || 0})</option>
               <option value="synced">已同步 ({statusCounts.synced || 0})</option>
               <option value="deleted">已删除 ({statusCounts.deleted || 0})</option>
+              <option value="failed">同步失败 ({statusCounts.failed || 0})</option>
             </select>
           </ToolbarGroup>
 

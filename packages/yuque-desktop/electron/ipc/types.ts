@@ -37,7 +37,7 @@ export interface Document {
   remoteCreatedAt?: string
   remoteUpdatedAt: string
   localSyncedAt?: string
-  syncStatus: 'synced' | 'pending' | 'modified' | 'new' | 'deleted'
+  syncStatus: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed'
 }
 
 export interface SyncOptions {
@@ -79,6 +79,7 @@ export interface AppSettings {
   linebreak: boolean
   latexcode: boolean
   theme: 'system' | 'light' | 'dark'
+  autoSyncInterval: 0 | 30 | 60 | 720 | 1440 // 0 = disabled, others in minutes
 }
 
 export interface SyncHistoryItem {
