@@ -29,6 +29,9 @@ const electronAPI: IPCInvokeAPI & IPCEventAPI = {
   'sync:getStatus': () => ipcRenderer.invoke('sync:getStatus'),
   'sync:getChanges': (bookIds) => ipcRenderer.invoke('sync:getChanges', bookIds),
   'sync:getHistory': (limit) => ipcRenderer.invoke('sync:getHistory', limit),
+  'sync:getFailedDocs': () => ipcRenderer.invoke('sync:getFailedDocs'),
+  'sync:retryFailedDoc': (docId) => ipcRenderer.invoke('sync:retryFailedDoc', docId),
+  'sync:clearFailedDoc': (docId) => ipcRenderer.invoke('sync:clearFailedDoc', docId),
 
   // Settings
   'settings:get': () => ipcRenderer.invoke('settings:get'),

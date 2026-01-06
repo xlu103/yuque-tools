@@ -10,6 +10,7 @@ import { BookList } from './BookList'
 import { DocumentList } from './DocumentList'
 import { SettingsPanel } from './SettingsPanel'
 import { SyncHistoryPanel } from './SyncHistoryPanel'
+import { FailedDocsPanel } from './FailedDocsPanel'
 
 interface MainLayoutProps {
   session: Session
@@ -45,6 +46,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
 
   const [showSettings, setShowSettings] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [showFailedDocs, setShowFailedDocs] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   
   // Auto sync timer ref
@@ -293,6 +295,10 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     return <SyncHistoryPanel onClose={() => setShowHistory(false)} />
   }
 
+  if (showFailedDocs) {
+    return <FailedDocsPanel onClose={() => setShowFailedDocs(false)} />
+  }
+
   return (
     <div className="h-screen w-screen flex bg-bg-primary">
       {/* Sidebar */}
@@ -310,6 +316,15 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
         }
         bottomContent={
           <div className="space-y-1">
+            <SidebarItem
+              icon={
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              }
+              label="同步失败"
+              onClick={() => setShowFailedDocs(true)}
+            />
             <SidebarItem
               icon={
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

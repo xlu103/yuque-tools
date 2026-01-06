@@ -8,7 +8,8 @@ import type {
   Document, 
   SyncStatus, 
   ChangeSet,
-  SyncHistoryItem
+  SyncHistoryItem,
+  FailedDocument
 } from './types'
 import {
   // Settings
@@ -21,6 +22,8 @@ import {
   // Documents
   upsertDocuments,
   getDocumentsByBookId,
+  getDocumentsByStatus,
+  updateDocumentSyncStatus,
   // Sync History
   getRecentSyncHistory
 } from '../db/stores'
@@ -291,6 +294,37 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       failedDocs: record.failed_docs,
       errorMessage: record.error_message
     }))
+  })
+
+  ipcMain.handle('sync:getFailedDocs', async (): Promise<FailedDocument[]> => {
+    console.log('sync:getFailedDocs called')
+    const failedDocs = getDocumentsByStatus('failed')
+    const allBooks = getAllBooks()
+    const booksMap = new Map(allBooks.map(b => [b.id, b]))
+    
+    return failedDocs.map((doc) => {
+      const book = booksMap.get(doc.book_id)
+      return {
+        id: doc.id,
+        bookId: doc.book_id,
+        bookName: book?.name || '未知知识库',
+        slug: doc.slug,
+        title: doc.title,
+        updatedAt: doc.updated_at
+      }
+    })
+  })
+
+  ipcMain.handle('sync:retryFailedDoc', async (_event, docId: string): Promise<void> => {
+    console.log('sync:retryFailedDoc called for:', docId)
+    // Reset status to 'new' so it will be picked up in next sync
+    updateDocumentSyncStatus(docId, 'new')
+  })
+
+  ipcMain.handle('sync:clearFailedDoc', async (_event, docId: string): Promise<void> => {
+    console.log('sync:clearFailedDoc called for:', docId)
+    // Mark as deleted to skip in future syncs
+    updateDocumentSyncStatus(docId, 'deleted')
   })
 
   // ============================================

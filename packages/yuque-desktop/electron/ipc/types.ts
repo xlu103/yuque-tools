@@ -93,6 +93,15 @@ export interface SyncHistoryItem {
   errorMessage: string | null
 }
 
+export interface FailedDocument {
+  id: string
+  bookId: string
+  bookName: string
+  slug: string
+  title: string
+  updatedAt: string
+}
+
 // ============================================
 // IPC Channel Definitions
 // ============================================
@@ -116,6 +125,9 @@ export interface IPCChannels {
   'sync:getStatus': () => Promise<SyncStatus>
   'sync:getChanges': (bookIds: string[]) => Promise<ChangeSet>
   'sync:getHistory': (limit?: number) => Promise<SyncHistoryItem[]>
+  'sync:getFailedDocs': () => Promise<FailedDocument[]>
+  'sync:retryFailedDoc': (docId: string) => Promise<void>
+  'sync:clearFailedDoc': (docId: string) => Promise<void>
 
   // Settings
   'settings:get': () => Promise<AppSettings>

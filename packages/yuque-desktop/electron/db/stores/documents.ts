@@ -36,7 +36,7 @@ export function getDocumentsByBookId(bookId: string): DocumentRecord[] {
  * Get documents by sync status
  */
 export function getDocumentsByStatus(
-  status: 'synced' | 'pending' | 'modified' | 'new' | 'deleted'
+  status: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed'
 ): DocumentRecord[] {
   const db = getDatabase()
   return db.prepare(

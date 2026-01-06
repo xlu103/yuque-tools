@@ -2,6 +2,8 @@
 export { LoginPage } from './LoginPage'
 export { MainLayout } from './MainLayout'
 export { SettingsPanel } from './SettingsPanel'
+export { SyncHistoryPanel } from './SyncHistoryPanel'
+export { FailedDocsPanel } from './FailedDocsPanel'
 
 // Components
 export { BookList } from './BookList'
