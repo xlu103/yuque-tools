@@ -7,7 +7,10 @@ export {
   useBooks,
   useSync,
   useSyncEvents,
-  useSettings
+  useSettings,
+  useSearch,
+  useResumeSync,
+  useStatistics
 } from './useIPC'
 
 // Theme Hook
@@ -30,5 +33,9 @@ export type {
   ChangeSet,
   AppSettings,
   SyncProgress,
-  SyncResult
+  SyncResult,
+  SearchOptions,
+  SearchResult,
+  InterruptedSession,
+  SyncStatistics
 } from './useIPC'

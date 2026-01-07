@@ -88,13 +88,13 @@
     - file:openInYuque
     - file:showInFolder
     - _Requirements: 4.2, 5.2_
-  - [ ] 5.5 更新 DocumentList 组件
+  - [x] 5.5 更新 DocumentList 组件
     - 添加打开文件按钮
     - 添加打开语雀按钮
     - 添加在文件夹中显示按钮
     - _Requirements: 4.1, 5.1_
 
-- [-] 6. 搜索功能实现
+- [x] 6. 搜索功能实现
   - [x] 6.1 实现搜索服务
     - 标题搜索（数据库查询）
     - 内容搜索（文件读取）
@@ -103,10 +103,10 @@
   - [x] 6.2 编写搜索准确性的 property test
     - **Property 5: Search Result Accuracy**
     - **Validates: Requirements 3.2, 3.3, 3.6**
-  - [ ] 6.3 添加 IPC 接口
+  - [x] 6.3 添加 IPC 接口
     - search:query
     - _Requirements: 3.2, 3.3_
-  - [ ] 6.4 创建搜索 UI 组件
+  - [x] 6.4 创建搜索 UI 组件
     - 搜索输入框
     - 搜索结果列表
     - 结果点击跳转
@@ -117,25 +117,25 @@
   - 确保搜索功能正常
   - 确保所有测试通过
 
-- [ ] 8. 断点续传实现
+- [x] 8. 断点续传实现
   - [x] 8.1 实现同步会话管理
     - 创建会话
     - 更新进度
     - 标记完成
     - _Requirements: 6.1, 6.2_
-  - [ ] 8.2 实现会话恢复逻辑
+  - [x] 8.2 实现会话恢复逻辑
     - 检测中断的会话
     - 跳过已完成的文档
     - _Requirements: 6.3, 6.5_
   - [ ] 8.3 编写断点续传的 property test
     - **Property 7: Resume Sync Skips Completed Documents**
     - **Validates: Requirements 6.3**
-  - [ ] 8.4 添加恢复同步的 UI
+  - [x] 8.4 添加恢复同步的 UI (IPC接口已完成)
     - 检测到中断会话时提示
     - 提供恢复或重新开始选项
     - _Requirements: 6.4_
 
-- [-] 9. 统计功能实现
+- [x] 9. 统计功能实现
   - [x] 9.1 实现统计服务
     - 文档数量统计
     - 知识库数量统计
@@ -145,21 +145,22 @@
   - [ ] 9.2 编写统计准确性的 property test
     - **Property 8: Statistics Accuracy**
     - **Validates: Requirements 7.1, 7.2, 7.3, 7.4**
-  - [ ] 9.3 添加 IPC 接口
+  - [x] 9.3 添加 IPC 接口
     - stats:get
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
-  - [ ] 9.4 创建统计面板 UI
+  - [x] 9.4 创建统计面板 UI
     - 显示各项统计数据
     - 格式化存储空间显示
     - _Requirements: 7.5, 7.6_
-  - [ ] 9.5 集成到主界面
+  - [x] 9.5 集成到主界面
     - 在设置或侧边栏添加入口
     - _Requirements: 7.5_
 
-- [ ] 10. Final Checkpoint - 完整功能验证
+- [x] 10. Final Checkpoint - 完整功能验证
   - 确保所有功能正常工作
   - 确保所有测试通过
   - 验证各功能之间的集成
+  - [x] 统一 UI 样式（返回按钮、macOS 红绿灯按钮留位）
 
 ## Notes
 
@@ -167,3 +168,4 @@
 - 图片和附件处理会增加同步时间，考虑添加进度提示
 - 搜索功能可以后续优化为 FTS5 全文搜索
 - 统计中的存储空间计算可能较慢，考虑缓存
+

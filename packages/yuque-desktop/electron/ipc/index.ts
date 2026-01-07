@@ -11,7 +11,11 @@ import type {
   SyncHistoryItem,
   FailedDocument,
   FileOperationResult,
-  OpenInYuqueParams
+  OpenInYuqueParams,
+  SearchOptions,
+  SearchResult,
+  InterruptedSession,
+  SyncStatistics
 } from './types'
 import {
   // Settings
@@ -45,13 +49,18 @@ import {
   startSync,
   cancelSync,
   getSyncStatus,
-  getChangesForBooks
+  getChangesForBooks,
+  getInterruptedSyncSession,
+  clearInterruptedSession,
+  markRunningSessionsAsInterrupted
 } from '../services/sync'
 import {
   openFile,
   openInYuque,
   showInFolder
 } from '../services/fileManager'
+import { searchService } from '../services/search'
+import { getStatistics } from '../services/statistics'
 
 /**
  * Register all IPC handlers
@@ -460,5 +469,52 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
   ipcMain.handle('file:showInFolder', async (_event, filePath: string): Promise<FileOperationResult> => {
     console.log('file:showInFolder called for:', filePath)
     return await showInFolder(filePath)
+  })
+
+  // ============================================
+  // Search Handlers
+  // ============================================
+
+  ipcMain.handle('search:query', async (_event, query: string, options?: SearchOptions): Promise<SearchResult[]> => {
+    console.log('search:query called with:', query, options)
+    try {
+      const results = await searchService.search(query, options)
+      return results
+    } catch (error) {
+      console.error('Search failed:', error)
+      return []
+    }
+  })
+
+  // ============================================
+  // Resume Sync Handlers (断点续传)
+  // ============================================
+
+  ipcMain.handle('sync:getInterruptedSession', async (): Promise<InterruptedSession | null> => {
+    console.log('sync:getInterruptedSession called')
+    const session = getInterruptedSyncSession()
+    if (!session) return null
+    
+    return {
+      id: session.id,
+      bookIds: session.bookIds,
+      totalDocs: session.totalDocs,
+      completedCount: session.completedDocIds.length,
+      startedAt: session.startedAt
+    }
+  })
+
+  ipcMain.handle('sync:clearInterruptedSession', async (_event, sessionId: number): Promise<void> => {
+    console.log('sync:clearInterruptedSession called for:', sessionId)
+    clearInterruptedSession(sessionId)
+  })
+
+  // ============================================
+  // Statistics Handlers (统计)
+  // ============================================
+
+  ipcMain.handle('stats:get', async (): Promise<SyncStatistics> => {
+    console.log('stats:get called')
+    return getStatistics()
   })
 }

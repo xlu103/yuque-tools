@@ -18,7 +18,7 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
   const { setTheme } = useTheme()
   const { showToast } = useToast()
   const { startSync } = useSync()
-  const { listBooks } = useBooks()
+  const { listBooks, getAllNotesForSync } = useBooks()
   const { isRunning, setRunning, setProgress } = useSyncStore()
   const { books, setBooks } = useBooksStore()
   

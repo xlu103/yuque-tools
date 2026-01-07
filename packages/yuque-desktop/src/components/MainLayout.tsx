@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
-import { useBooks, useSync, useSyncEvents, useToast, useIsElectron, useSettings } from '../hooks'
-import type { Session, SyncProgress, Document } from '../hooks'
+import { useBooks, useSync, useSyncEvents, useToast, useIsElectron, useSettings, useSearch } from '../hooks'
+import type { Session, SyncProgress, SearchResult } from '../hooks'
 import { useBooksStore, useSyncStore } from '../stores'
 import { MacSidebar, SidebarSection, SidebarItem } from './ui/MacSidebar'
 import { MacToolbar, ToolbarGroup, ToolbarDivider, ToolbarTitle } from './ui/MacToolbar'
@@ -10,6 +10,7 @@ import { BookList } from './BookList'
 import { DocumentList } from './DocumentList'
 import { SettingsPanel } from './SettingsPanel'
 import { SyncHistoryPanel } from './SyncHistoryPanel'
+import { StatisticsPanel } from './StatisticsPanel'
 
 // Notes book ID constant
 const NOTES_BOOK_ID = '__notes__'
@@ -25,6 +26,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const { startSync, cancelSync } = useSync()
   const { getSettings } = useSettings()
   const { showToast } = useToast()
+  const { search } = useSearch()
   
   const { 
     books, 
@@ -48,7 +50,15 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
 
   const [showSettings, setShowSettings] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [showStats, setShowStats] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [showSearchResults, setShowSearchResults] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   
   // Notes lazy loading state
   const [notesHasMore, setNotesHasMore] = useState(true)
@@ -322,6 +332,50 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     }
   }, [cancelSync, setRunning, setProgress, showToast])
 
+  // Handle search
+  const handleSearch = useCallback(async () => {
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      setShowSearchResults(false)
+      return
+    }
+
+    setIsSearching(true)
+    setShowSearchResults(true)
+    try {
+      const results = await search(searchQuery.trim(), { limit: 20, searchContent: true })
+      setSearchResults(results)
+    } catch (error) {
+      console.error('Search failed:', error)
+      setSearchResults([])
+    } finally {
+      setIsSearching(false)
+    }
+  }, [searchQuery, search])
+
+  // Handle search result click
+  const handleSearchResultClick = useCallback((result: SearchResult) => {
+    if (result.localPath && window.electronAPI) {
+      window.electronAPI['file:open'](result.localPath)
+    } else {
+      setSelectedBookId(result.bookId)
+    }
+    setShowSearchResults(false)
+    setSearchQuery('')
+  }, [setSelectedBookId])
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.search-container')) {
+        setShowSearchResults(false)
+      }
+    }
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
+
   // Get current documents
   const currentDocs = selectedBookId ? getDocumentsForBook(selectedBookId) : []
   const selectedBook = books.find(b => b.id === selectedBookId)
@@ -336,6 +390,10 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     acc[doc.syncStatus] = (acc[doc.syncStatus] || 0) + 1
     return acc
   }, {} as Record<string, number>)
+
+  if (showStats) {
+    return <StatisticsPanel onClose={() => setShowStats(false)} />
+  }
 
   if (showSettings) {
     return <SettingsPanel onClose={() => setShowSettings(false)} onLogout={onLogout} />
@@ -362,6 +420,15 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
         }
         bottomContent={
           <div className="space-y-1">
+            <SidebarItem
+              icon={
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              }
+              label="统计"
+              onClick={() => setShowStats(true)}
+            />
             <SidebarItem
               icon={
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -408,6 +475,69 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar */}
         <MacToolbar>
+          {/* Search box */}
+          <div className="search-container relative">
+            <div className="relative">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSearch()
+                  if (e.key === 'Escape') {
+                    setShowSearchResults(false)
+                    setSearchQuery('')
+                  }
+                }}
+                onFocus={() => searchQuery && setShowSearchResults(true)}
+                placeholder="搜索文档..."
+                className="w-48 pl-8 pr-3 py-1 text-xs bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent focus:w-64 transition-all"
+              />
+            </div>
+            
+            {/* Search results dropdown */}
+            {showSearchResults && (
+              <div className="absolute top-full left-0 mt-1 w-80 max-h-96 overflow-auto bg-bg-primary border border-border rounded-lg shadow-lg z-50">
+                {isSearching ? (
+                  <div className="p-4 text-center text-text-secondary text-sm">搜索中...</div>
+                ) : searchResults.length > 0 ? (
+                  <div className="divide-y divide-border-light">
+                    {searchResults.map((result) => (
+                      <div
+                        key={`${result.docId}-${result.matchType}`}
+                        className="px-3 py-2 hover:bg-bg-secondary cursor-pointer"
+                        onClick={() => handleSearchResultClick(result)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1 py-0.5 text-xs rounded ${
+                            result.matchType === 'title' 
+                              ? 'bg-accent/10 text-accent' 
+                              : 'bg-green-500/10 text-green-600'
+                          }`}>
+                            {result.matchType === 'title' ? '标题' : '内容'}
+                          </span>
+                          <span className="text-sm text-text-primary truncate flex-1">{result.title}</span>
+                        </div>
+                        <p className="text-xs text-text-tertiary mt-0.5 truncate">{result.bookName}</p>
+                        {result.snippet && (
+                          <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">{result.snippet}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : searchQuery ? (
+                  <div className="p-4 text-center text-text-secondary text-sm">未找到结果</div>
+                ) : null}
+              </div>
+            )}
+          </div>
+          
+          <ToolbarDivider />
+          
           <ToolbarGroup>
             <ToolbarTitle>
               {selectedBook?.name || '选择知识库'}
@@ -505,6 +635,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             onLoadMore={selectedBookId === NOTES_BOOK_ID ? handleLoadMoreNotes : undefined}
             hasMore={selectedBookId === NOTES_BOOK_ID ? notesHasMore : false}
             loadingMore={notesLoading}
+            bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
           />
         </div>
       </div>

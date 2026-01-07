@@ -47,6 +47,16 @@ const electronAPI: IPCInvokeAPI & IPCEventAPI = {
   'file:openInYuque': (params) => ipcRenderer.invoke('file:openInYuque', params),
   'file:showInFolder': (filePath) => ipcRenderer.invoke('file:showInFolder', filePath),
 
+  // Search
+  'search:query': (query, options) => ipcRenderer.invoke('search:query', query, options),
+
+  // Resume sync (断点续传)
+  'sync:getInterruptedSession': () => ipcRenderer.invoke('sync:getInterruptedSession'),
+  'sync:clearInterruptedSession': (sessionId) => ipcRenderer.invoke('sync:clearInterruptedSession', sessionId),
+
+  // Statistics (统计)
+  'stats:get': () => ipcRenderer.invoke('stats:get'),
+
   // Event listeners
   on: (channel, callback) => {
     const subscription = (_event: Electron.IpcRendererEvent, data: unknown) => {

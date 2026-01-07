@@ -10,7 +10,11 @@ import type {
   ChangeSet,
   AppSettings,
   SyncProgress,
-  SyncResult
+  SyncResult,
+  SearchOptions,
+  SearchResult,
+  InterruptedSession,
+  SyncStatistics
 } from '@electron/ipc/types'
 
 // Re-export types for convenience
@@ -24,7 +28,11 @@ export type {
   ChangeSet,
   AppSettings,
   SyncProgress,
-  SyncResult
+  SyncResult,
+  SearchOptions,
+  SearchResult,
+  InterruptedSession,
+  SyncStatistics
 }
 
 /**
@@ -213,4 +221,54 @@ export function useSettings() {
 export function useIPC() {
   const isElectron = useIsElectron()
   return { isElectron }
+}
+
+/**
+ * Search hooks
+ */
+export function useSearch() {
+  const isElectron = useIsElectron()
+
+  const search = useCallback(
+    async (query: string, options?: SearchOptions): Promise<SearchResult[]> => {
+      if (!isElectron) throw new Error('Not in Electron environment')
+      return window.electronAPI['search:query'](query, options)
+    },
+    [isElectron]
+  )
+
+  return { search, isElectron }
+}
+
+/**
+ * Resume sync hooks (断点续传)
+ */
+export function useResumeSync() {
+  const isElectron = useIsElectron()
+
+  const getInterruptedSession = useCallback(async (): Promise<InterruptedSession | null> => {
+    if (!isElectron) throw new Error('Not in Electron environment')
+    return window.electronAPI['sync:getInterruptedSession']()
+  }, [isElectron])
+
+  const clearInterruptedSession = useCallback(async (sessionId: number): Promise<void> => {
+    if (!isElectron) throw new Error('Not in Electron environment')
+    return window.electronAPI['sync:clearInterruptedSession'](sessionId)
+  }, [isElectron])
+
+  return { getInterruptedSession, clearInterruptedSession, isElectron }
+}
+
+/**
+ * Statistics hooks (统计)
+ */
+export function useStatistics() {
+  const isElectron = useIsElectron()
+
+  const getStats = useCallback(async (): Promise<SyncStatistics> => {
+    if (!isElectron) throw new Error('Not in Electron environment')
+    return window.electronAPI['stats:get']()
+  }, [isElectron])
+
+  return { getStats, isElectron }
 }

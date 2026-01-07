@@ -201,12 +201,29 @@ export function getResourceStatistics(): {
   totalSizeBytes: number
 } {
   const db = getDatabase()
+  
+  // 首先检查表是否存在
+  const tableExists = db.prepare(
+    "SELECT name FROM sqlite_master WHERE type='table' AND name='resources'"
+  ).get()
+  
+  if (!tableExists) {
+    console.log('[getResourceStatistics] resources table does not exist')
+    return {
+      totalImages: 0,
+      downloadedImages: 0,
+      totalAttachments: 0,
+      downloadedAttachments: 0,
+      totalSizeBytes: 0
+    }
+  }
+  
   const row = db.prepare(`
     SELECT 
-      SUM(CASE WHEN type = 'image' THEN 1 ELSE 0 END) as total_images,
-      SUM(CASE WHEN type = 'image' AND status = 'downloaded' THEN 1 ELSE 0 END) as downloaded_images,
-      SUM(CASE WHEN type = 'attachment' THEN 1 ELSE 0 END) as total_attachments,
-      SUM(CASE WHEN type = 'attachment' AND status = 'downloaded' THEN 1 ELSE 0 END) as downloaded_attachments,
+      COALESCE(SUM(CASE WHEN type = 'image' THEN 1 ELSE 0 END), 0) as total_images,
+      COALESCE(SUM(CASE WHEN type = 'image' AND status = 'downloaded' THEN 1 ELSE 0 END), 0) as downloaded_images,
+      COALESCE(SUM(CASE WHEN type = 'attachment' THEN 1 ELSE 0 END), 0) as total_attachments,
+      COALESCE(SUM(CASE WHEN type = 'attachment' AND status = 'downloaded' THEN 1 ELSE 0 END), 0) as downloaded_attachments,
       COALESCE(SUM(size_bytes), 0) as total_size_bytes
     FROM resources
   `).get() as {
@@ -216,6 +233,8 @@ export function getResourceStatistics(): {
     downloaded_attachments: number
     total_size_bytes: number
   }
+
+  console.log('[getResourceStatistics] Query result:', row)
 
   return {
     totalImages: row.total_images ?? 0,

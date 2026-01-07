@@ -113,6 +113,45 @@ export interface OpenInYuqueParams {
   docSlug: string
 }
 
+export interface SearchOptions {
+  limit?: number
+  bookId?: string
+  searchContent?: boolean
+}
+
+export interface SearchResult {
+  docId: string
+  title: string
+  bookId: string
+  bookName: string
+  snippet: string
+  matchType: 'title' | 'content'
+  localPath: string | null
+}
+
+export interface InterruptedSession {
+  id: number
+  bookIds: string[]
+  totalDocs: number
+  completedCount: number
+  startedAt: string
+}
+
+export interface SyncStatistics {
+  totalDocuments: number
+  syncedDocuments: number
+  failedDocuments: number
+  pendingDocuments: number
+  newDocuments: number
+  modifiedDocuments: number
+  deletedDocuments: number
+  totalBooks: number
+  totalStorageBytes: number
+  lastSyncTime: string | null
+  imageCount: number
+  attachmentCount: number
+}
+
 // ============================================
 // IPC Channel Definitions
 // ============================================
@@ -153,6 +192,16 @@ export interface IPCChannels {
   'file:open': (filePath: string) => Promise<FileOperationResult>
   'file:openInYuque': (params: OpenInYuqueParams) => Promise<FileOperationResult>
   'file:showInFolder': (filePath: string) => Promise<FileOperationResult>
+
+  // Search
+  'search:query': (query: string, options?: SearchOptions) => Promise<SearchResult[]>
+
+  // Resume sync (断点续传)
+  'sync:getInterruptedSession': () => Promise<InterruptedSession | null>
+  'sync:clearInterruptedSession': (sessionId: number) => Promise<void>
+
+  // Statistics (统计)
+  'stats:get': () => Promise<SyncStatistics>
 }
 
 /**

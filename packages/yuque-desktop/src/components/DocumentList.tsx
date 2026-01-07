@@ -1,6 +1,6 @@
-import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
+import { useCallback, useRef, useEffect } from 'react'
 import type { Document } from '../hooks'
-import { useDebounce } from '../hooks'
+import { useIsElectron } from '../hooks'
 
 interface DocumentListProps {
   documents: Document[]
@@ -13,6 +13,8 @@ interface DocumentListProps {
   onLoadMore?: () => void
   hasMore?: boolean
   loadingMore?: boolean
+  // Book info for opening in Yuque
+  bookInfo?: { userLogin: string; slug: string }
 }
 
 const statusConfig = {
@@ -33,11 +35,52 @@ export function DocumentList({
   selectable = false,
   onLoadMore,
   hasMore = false,
-  loadingMore = false
+  loadingMore = false,
+  bookInfo
 }: DocumentListProps) {
-  const [searchQuery, setSearchQuery] = useState('')
-  const debouncedSearch = useDebounce(searchQuery, 200)
   const listRef = useRef<HTMLDivElement>(null)
+  const isElectron = useIsElectron()
+
+  // File operations
+  const handleOpenFile = useCallback(async (doc: Document) => {
+    if (!isElectron || !doc.localPath) return
+    try {
+      const result = await window.electronAPI['file:open'](doc.localPath)
+      if (!result.success) {
+        console.error('Failed to open file:', result.error)
+      }
+    } catch (error) {
+      console.error('Failed to open file:', error)
+    }
+  }, [isElectron])
+
+  const handleOpenInYuque = useCallback(async (doc: Document) => {
+    if (!isElectron || !bookInfo) return
+    try {
+      const result = await window.electronAPI['file:openInYuque']({
+        userLogin: bookInfo.userLogin,
+        bookSlug: bookInfo.slug,
+        docSlug: doc.slug
+      })
+      if (!result.success) {
+        console.error('Failed to open in Yuque:', result.error)
+      }
+    } catch (error) {
+      console.error('Failed to open in Yuque:', error)
+    }
+  }, [isElectron, bookInfo])
+
+  const handleShowInFolder = useCallback(async (doc: Document) => {
+    if (!isElectron || !doc.localPath) return
+    try {
+      const result = await window.electronAPI['file:showInFolder'](doc.localPath)
+      if (!result.success) {
+        console.error('Failed to show in folder:', result.error)
+      }
+    } catch (error) {
+      console.error('Failed to show in folder:', error)
+    }
+  }, [isElectron])
 
   // Scroll handler for lazy loading
   useEffect(() => {
@@ -65,31 +108,24 @@ export function DocumentList({
     return () => listElement.removeEventListener('scroll', handleScroll)
   }, [onLoadMore, hasMore, loadingMore])
 
-  // Filter by search query (debounced)
-  const filteredDocs = useMemo(() => {
-    if (!debouncedSearch) return documents
-    const query = debouncedSearch.toLowerCase()
-    return documents.filter(d => d.title.toLowerCase().includes(query))
-  }, [documents, debouncedSearch])
-
   // Handle select all
   const handleSelectAll = useCallback(() => {
     if (!onSelectionChange) return
     
-    const allSelected = filteredDocs.every(d => selectedIds.has(d.id))
+    const allSelected = documents.every(d => selectedIds.has(d.id))
     
     if (allSelected) {
       // Deselect all
       const newSelection = new Set(selectedIds)
-      filteredDocs.forEach(d => newSelection.delete(d.id))
+      documents.forEach(d => newSelection.delete(d.id))
       onSelectionChange(newSelection)
     } else {
       // Select all
       const newSelection = new Set(selectedIds)
-      filteredDocs.forEach(d => newSelection.add(d.id))
+      documents.forEach(d => newSelection.add(d.id))
       onSelectionChange(newSelection)
     }
-  }, [filteredDocs, selectedIds, onSelectionChange])
+  }, [documents, selectedIds, onSelectionChange])
 
   // Handle single selection
   const handleToggleSelect = useCallback((docId: string) => {
@@ -123,29 +159,13 @@ export function DocumentList({
     )
   }
 
-  const allSelected = filteredDocs.length > 0 && filteredDocs.every(d => selectedIds.has(d.id))
-  const someSelected = filteredDocs.some(d => selectedIds.has(d.id))
+  const allSelected = documents.length > 0 && documents.every(d => selectedIds.has(d.id))
+  const someSelected = documents.some(d => selectedIds.has(d.id))
 
   return (
     <div className="flex flex-col h-full">
-      {/* Search bar */}
-      <div className="px-4 py-2 border-b border-border-light">
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            type="text"
-            placeholder="搜索文档..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-1.5 text-sm bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent"
-          />
-        </div>
-      </div>
-
       {/* Select all header */}
-      {selectable && filteredDocs.length > 0 && (
+      {selectable && documents.length > 0 && (
         <div className="px-4 py-2 border-b border-border-light bg-bg-secondary flex items-center gap-3">
           <input
             type="checkbox"
@@ -164,14 +184,15 @@ export function DocumentList({
 
       {/* Document list */}
       <div ref={listRef} className="flex-1 overflow-auto divide-y divide-border-light">
-        {filteredDocs.map((doc) => {
+        {documents.map((doc) => {
           const status = statusConfig[doc.syncStatus]
           const isSelected = selectedIds.has(doc.id)
+          const isSynced = doc.syncStatus === 'synced' && doc.localPath
           
           return (
             <div
               key={doc.id}
-              className={`px-4 py-3 hover:bg-bg-secondary transition-colors duration-150 ${isSelected ? 'bg-accent/5' : ''}`}
+              className={`px-4 py-3 hover:bg-bg-secondary transition-colors duration-150 group ${isSelected ? 'bg-accent/5' : ''}`}
               onClick={selectable ? () => handleToggleSelect(doc.id) : undefined}
             >
               <div className="flex items-start gap-3">
@@ -222,6 +243,48 @@ export function DocumentList({
                   </div>
                 </div>
                 
+                {/* Action buttons - show on hover */}
+                <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Open file button */}
+                  {isSynced && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleOpenFile(doc) }}
+                      className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                      title="打开文件"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                      </svg>
+                    </button>
+                  )}
+                  
+                  {/* Show in folder button */}
+                  {isSynced && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleShowInFolder(doc) }}
+                      className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                      title="在文件夹中显示"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                    </button>
+                  )}
+                  
+                  {/* Open in Yuque button */}
+                  {bookInfo && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleOpenInYuque(doc) }}
+                      className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                      title="在语雀中打开"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                
                 {/* Status badge */}
                 <div className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium ${status.color} ${status.bg}`}>
                   {status.label}
@@ -251,13 +314,6 @@ export function DocumentList({
           </div>
         )}
       </div>
-
-      {/* No results */}
-      {filteredDocs.length === 0 && searchQuery && (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-text-secondary">未找到匹配的文档</p>
-        </div>
-      )}
     </div>
   )
 }
