@@ -130,6 +130,10 @@ export interface IPCChannels {
   'books:list': () => Promise<KnowledgeBase[]>
   'books:getDocs': (bookId: string) => Promise<Document[]>
 
+  // Notes (小记)
+  'notes:loadMore': (offset: number, limit?: number) => Promise<{ notes: Document[]; hasMore: boolean }>
+  'notes:getAllForSync': () => Promise<Document[]>
+
   // Sync
   'sync:start': (options: SyncOptions) => Promise<SyncResult>
   'sync:cancel': () => Promise<void>

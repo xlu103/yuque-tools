@@ -37,7 +37,9 @@ import {
 } from '../services/auth'
 import {
   getBookStacks,
-  getDocsOfBook
+  getDocsOfBook,
+  loadMoreNotes,
+  getAllNotesForSync
 } from '../services/books'
 import {
   startSync,
@@ -95,18 +97,20 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       // Fetch knowledge bases from Yuque API
       const books = await getBookStacks()
       
-      // Store in Meta Store
-      const bookInputs: BookInput[] = books.map((book) => ({
-        id: book.id,
-        slug: book.slug,
-        name: book.name,
-        userLogin: book.userLogin,
-        type: book.type,
-        docCount: book.docCount
-      }))
+      // Store in Meta Store (exclude notes virtual book)
+      const bookInputs: BookInput[] = books
+        .filter((book) => book.id !== '__notes__')
+        .map((book) => ({
+          id: book.id,
+          slug: book.slug,
+          name: book.name,
+          userLogin: book.userLogin,
+          type: book.type,
+          docCount: book.docCount
+        }))
       upsertBooks(bookInputs)
       
-      console.log(`Fetched and stored ${books.length} knowledge bases`)
+      console.log(`Fetched and stored ${bookInputs.length} knowledge bases (plus notes)`)
       return books
     } catch (error) {
       console.error('Failed to fetch books:', error)
@@ -137,10 +141,17 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       const existingDocs = getDocumentsByBookId(bookId)
       const existingDocsMap = new Map(existingDocs.map((d) => [d.id, d]))
       
+      // For notes, we don't preserve failed status - allow retry
+      const isNotesBook = bookId === '__notes__'
+      
       // Log existing failed documents
       const failedDocs = existingDocs.filter(d => d.sync_status === 'failed')
-      console.log(`[books:getDocs] Found ${failedDocs.length} failed documents in local DB:`, 
-        failedDocs.map(d => ({ id: d.id, title: d.title, status: d.sync_status })))
+      if (failedDocs.length > 0) {
+        console.log(`[books:getDocs] Found ${failedDocs.length} failed documents in local DB`)
+        if (isNotesBook) {
+          console.log(`[books:getDocs] Notes book - will reset failed status to 'new' for retry`)
+        }
+      }
       
       // Prepare document inputs, preserving existing sync status where applicable
       const docInputs: DocumentInput[] = docs.map((doc) => {
@@ -150,9 +161,15 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
         if (existing) {
           // Document exists locally
           if (existing.sync_status === 'failed') {
-            // Preserve failed status - don't retry automatically
-            syncStatus = 'failed'
-            console.log(`[books:getDocs] Preserving failed status for doc: ${doc.title} (id: ${doc.id})`)
+            // For notes, reset failed status to 'new' to allow retry
+            // For regular docs, preserve failed status
+            if (isNotesBook) {
+              syncStatus = 'new'
+              console.log(`[books:getDocs] Resetting failed note to 'new': ${doc.title} (id: ${doc.id})`)
+            } else {
+              syncStatus = 'failed'
+              console.log(`[books:getDocs] Preserving failed status for doc: ${doc.title} (id: ${doc.id})`)
+            }
           } else if (existing.sync_status === 'synced') {
             // Check if remote has been updated
             const remoteTime = new Date(doc.remoteUpdatedAt).getTime()
@@ -188,8 +205,10 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       // Store in Meta Store
       upsertDocuments(docInputs)
       
-      // Update book document count
-      updateBookDocCount(bookId, docs.length)
+      // Update book document count (skip for notes virtual book)
+      if (bookId !== '__notes__') {
+        updateBookDocCount(bookId, docs.length)
+      }
       
       console.log(`Fetched and stored ${docs.length} documents for book ${bookId}`)
       
@@ -226,6 +245,57 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
   })
 
   // ============================================
+  // Notes Handlers (小记懒加载)
+  // ============================================
+
+  ipcMain.handle('notes:loadMore', async (_event, offset: number, limit?: number): Promise<{ notes: Document[]; hasMore: boolean }> => {
+    console.log('notes:loadMore called with offset:', offset, 'limit:', limit)
+    try {
+      const result = await loadMoreNotes(offset, limit || 20)
+      
+      // Store in Meta Store
+      const docInputs: DocumentInput[] = result.notes.map((doc) => ({
+        id: doc.id,
+        bookId: doc.bookId,
+        slug: doc.slug,
+        title: doc.title,
+        remoteUpdatedAt: doc.remoteUpdatedAt,
+        syncStatus: 'new'
+      }))
+      upsertDocuments(docInputs)
+      
+      return result
+    } catch (error) {
+      console.error('Failed to load more notes:', error)
+      throw error
+    }
+  })
+
+  ipcMain.handle('notes:getAllForSync', async (): Promise<Document[]> => {
+    console.log('notes:getAllForSync called')
+    try {
+      const notes = await getAllNotesForSync()
+      
+      // Store in Meta Store
+      const docInputs: DocumentInput[] = notes.map((doc) => ({
+        id: doc.id,
+        bookId: doc.bookId,
+        slug: doc.slug,
+        title: doc.title,
+        remoteUpdatedAt: doc.remoteUpdatedAt,
+        syncStatus: 'new'
+      }))
+      upsertDocuments(docInputs)
+      
+      console.log(`Fetched and stored ${notes.length} notes for sync`)
+      return notes
+    } catch (error) {
+      console.error('Failed to get all notes for sync:', error)
+      throw error
+    }
+  })
+
+  // ============================================
   // Sync Handlers
   // ============================================
 
@@ -240,6 +310,16 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
         userLogin: book.user_login,
         slug: book.slug,
         name: book.name
+      })
+    }
+    
+    // Add notes book info (小记)
+    const session = await getCurrentSession()
+    if (session) {
+      bookInfoMap.set('__notes__', {
+        userLogin: session.login,
+        slug: 'notes',
+        name: '小记'
       })
     }
 

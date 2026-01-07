@@ -102,6 +102,17 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
         return
       }
 
+      // For notes book, fetch all notes first
+      const hasNotesBook = allBooks.some(b => b.id === '__notes__')
+      if (hasNotesBook) {
+        showToast('info', '正在获取所有小记...')
+        try {
+          await getAllNotesForSync()
+        } catch (e) {
+          console.error('Failed to fetch all notes:', e)
+        }
+      }
+
       const allBookIds = allBooks.map(b => b.id)
       showToast('info', `开始强制同步 ${allBooks.length} 个知识库...`)
 
@@ -120,7 +131,7 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
       setRunning(false)
       setProgress(null)
     }
-  }, [isRunning, isForceSyncing, settings.syncDirectory, books, listBooks, setBooks, startSync, setRunning, setProgress, showToast])
+  }, [isRunning, isForceSyncing, settings.syncDirectory, books, listBooks, setBooks, startSync, setRunning, setProgress, showToast, getAllNotesForSync])
 
   if (loading) {
     return (

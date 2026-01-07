@@ -35,6 +35,7 @@ import type { Document, ChangeSet, SyncProgress, SyncResult, SyncOptions } from 
 import type { DocumentRecord } from '../db/stores/types'
 import { processDocumentImages } from './imageProcessor'
 import { processDocumentAttachments } from './attachmentProcessor'
+import { NOTES_BOOK_ID, NOTES_BOOK_NAME, getNotes, getCachedNoteContent } from './books'
 
 // Yuque API configuration
 const YUQUE_CONFIG = {
@@ -225,6 +226,11 @@ async function fetchRemoteDocs(bookId: string): Promise<Document[]> {
     throw new Error('未登录或会话已过期')
   }
 
+  // Handle notes specially
+  if (bookId === NOTES_BOOK_ID) {
+    return getNotes()
+  }
+
   const response = await axios({
     url: `${YUQUE_CONFIG.host}/api/docs?book_id=${bookId}`,
     method: 'get',
@@ -278,6 +284,189 @@ async function downloadDocumentContent(
   })
 
   return response.data
+}
+
+/**
+ * Download note content (小记)
+ * Uses cached content from getNotes() call
+ * Falls back to API call if not cached
+ */
+async function downloadNoteContent(noteId: string): Promise<string> {
+  console.log(`[downloadNoteContent] Getting content for note: ${noteId}`)
+  
+  // Try to get from cache first
+  const cached = getCachedNoteContent(noteId)
+  if (cached) {
+    console.log(`[downloadNoteContent] Found cached content, length: ${cached.content.length}`)
+    
+    // Convert HTML to markdown
+    let markdown = htmlToMarkdown(cached.content)
+    
+    // Add tags as frontmatter if present
+    if (cached.tags.length > 0) {
+      const tagNames = cached.tags.join(', ')
+      markdown = `---\ntags: [${tagNames}]\n---\n\n${markdown}`
+    }
+    
+    // Add metadata
+    if (cached.createdAt || cached.updatedAt) {
+      const metaLines = []
+      if (cached.createdAt) metaLines.push(`创建时间: ${cached.createdAt}`)
+      if (cached.updatedAt) metaLines.push(`更新时间: ${cached.updatedAt}`)
+      markdown = markdown + `\n\n---\n*${metaLines.join(' | ')}*`
+    }
+    
+    console.log(`[downloadNoteContent] Converted markdown length: ${markdown.length}`)
+    return markdown
+  }
+  
+  // Fallback: fetch from API (this shouldn't happen normally)
+  console.log(`[downloadNoteContent] No cached content, fetching from API...`)
+  
+  const session = getValidSession()
+  if (!session) {
+    throw new Error('未登录或会话已过期')
+  }
+
+  // Extract numeric ID from note_XXXXX format
+  const numericId = noteId.replace('note_', '')
+  const url = `${YUQUE_CONFIG.host}/api/modules/note/notes/NoteController/detail?id=${numericId}`
+  console.log(`[downloadNoteContent] API URL: ${url}`)
+
+  try {
+    const response = await axios({
+      url,
+      method: 'get',
+      headers: {
+        'content-type': 'application/json',
+        'x-requested-with': 'XMLHttpRequest',
+        'user-agent': YUQUE_CONFIG.userAgent,
+        cookie: session.cookies
+      }
+    })
+
+    console.log(`[downloadNoteContent] Response status: ${response.status}`)
+    const noteData = response.data?.data || response.data
+    
+    // Try different content fields
+    let htmlContent = ''
+    if (noteData?.content?.abstract) {
+      htmlContent = noteData.content.abstract
+    } else if (noteData?.abstract) {
+      htmlContent = noteData.abstract
+    } else if (noteData?.body) {
+      htmlContent = noteData.body
+    } else if (typeof noteData === 'string') {
+      htmlContent = noteData
+    }
+    
+    if (!htmlContent) {
+      console.warn(`[downloadNoteContent] No content found for note ${noteId}`)
+      return `# 小记\n\n*内容为空或无法获取*`
+    }
+    
+    // Convert HTML to markdown
+    let markdown = htmlToMarkdown(htmlContent)
+    
+    // Add tags as frontmatter if present
+    const tags = noteData?.tags || []
+    if (tags.length > 0) {
+      const tagNames = tags.map((t: any) => t.name).join(', ')
+      markdown = `---\ntags: [${tagNames}]\n---\n\n${markdown}`
+    }
+    
+    return markdown
+  } catch (error: any) {
+    console.error(`[downloadNoteContent] Failed to fetch note ${noteId}:`, error.message)
+    throw error
+  }
+}
+
+/**
+ * Simple HTML to Markdown converter
+ * Handles Yuque's Lake format (<!doctype lake>)
+ */
+function htmlToMarkdown(html: string): string {
+  if (!html) return ''
+  
+  let md = html
+  
+  // Remove Lake doctype and meta tags
+  md = md.replace(/<!doctype\s+lake>/gi, '')
+  md = md.replace(/<meta[^>]*>/gi, '')
+  
+  // Handle Lake-specific card elements (checkboxes, etc.)
+  md = md.replace(/<card[^>]*type="inline"[^>]*name="checkbox"[^>]*value="true"[^>]*><\/card>/gi, '[x] ')
+  md = md.replace(/<card[^>]*type="inline"[^>]*name="checkbox"[^>]*value="false"[^>]*><\/card>/gi, '[ ] ')
+  md = md.replace(/<card[^>]*type="inline"[^>]*name="checkbox"[^>]*><\/card>/gi, '[ ] ')
+  md = md.replace(/<card[^>]*>[^<]*<\/card>/gi, '')
+  
+  // Handle Lake list items with task checkboxes
+  md = md.replace(/<li[^>]*class="[^"]*lake-list-task[^"]*"[^>]*>/gi, '- ')
+  
+  // Replace common HTML tags
+  md = md.replace(/<br\s*\/?>/gi, '\n')
+  md = md.replace(/<\/p>/gi, '\n\n')
+  md = md.replace(/<p[^>]*>/gi, '')
+  md = md.replace(/<\/div>/gi, '\n')
+  md = md.replace(/<div[^>]*>/gi, '')
+  
+  // Handle spans (just extract text)
+  md = md.replace(/<span[^>]*>(.*?)<\/span>/gi, '$1')
+  
+  // Bold
+  md = md.replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+  md = md.replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+  
+  // Italic
+  md = md.replace(/<em[^>]*>(.*?)<\/em>/gi, '*$1*')
+  md = md.replace(/<i[^>]*>(.*?)<\/i>/gi, '*$1*')
+  
+  // Code
+  md = md.replace(/<code[^>]*>(.*?)<\/code>/gi, '`$1`')
+  
+  // Links
+  md = md.replace(/<a[^>]+href="([^"]*)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+  
+  // Images
+  md = md.replace(/<img[^>]+src="([^"]*)"[^>]*>/gi, '![]($1)')
+  
+  // Lists
+  md = md.replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
+  md = md.replace(/<\/?[ou]l[^>]*>/gi, '\n')
+  
+  // Headers
+  md = md.replace(/<h1[^>]*>(.*?)<\/h1>/gi, '# $1\n')
+  md = md.replace(/<h2[^>]*>(.*?)<\/h2>/gi, '## $1\n')
+  md = md.replace(/<h3[^>]*>(.*?)<\/h3>/gi, '### $1\n')
+  md = md.replace(/<h4[^>]*>(.*?)<\/h4>/gi, '#### $1\n')
+  
+  // Blockquote
+  md = md.replace(/<blockquote[^>]*>(.*?)<\/blockquote>/gi, '> $1\n')
+  
+  // Remove remaining HTML tags
+  md = md.replace(/<[^>]+>/g, '')
+  
+  // Decode HTML entities
+  md = md.replace(/&nbsp;/g, ' ')
+  md = md.replace(/&lt;/g, '<')
+  md = md.replace(/&gt;/g, '>')
+  md = md.replace(/&amp;/g, '&')
+  md = md.replace(/&quot;/g, '"')
+  md = md.replace(/&#39;/g, "'")
+  md = md.replace(/&ldquo;/g, '"')
+  md = md.replace(/&rdquo;/g, '"')
+  md = md.replace(/&lsquo;/g, "'")
+  md = md.replace(/&rsquo;/g, "'")
+  md = md.replace(/&mdash;/g, '—')
+  md = md.replace(/&ndash;/g, '–')
+  md = md.replace(/&hellip;/g, '...')
+  
+  // Clean up extra whitespace
+  md = md.replace(/\n{3,}/g, '\n\n')
+  md = md.trim()
+  
+  return md
 }
 
 /**
@@ -470,6 +659,14 @@ export async function startSync(
       docsToSync = docsToSync.filter(d => docIdSet.has(d.id))
     }
 
+    // Limit notes to 10 for now (experimental feature)
+    const noteDocs = docsToSync.filter(d => d.bookId === NOTES_BOOK_ID)
+    const otherDocs = docsToSync.filter(d => d.bookId !== NOTES_BOOK_ID)
+    if (noteDocs.length > 10) {
+      console.log(`[startSync] Limiting notes from ${noteDocs.length} to 10`)
+      docsToSync = [...otherDocs, ...noteDocs.slice(0, 10)]
+    }
+
     const totalDocs = docsToSync.length
     console.log(`[startSync] Final docsToSync count: ${totalDocs}`)
 
@@ -510,14 +707,30 @@ export async function startSync(
       }
 
       try {
-        // Download content
-        const content = await downloadDocumentContent(
-          bookInfo.userLogin,
-          bookInfo.slug,
-          doc.slug,
-          linebreak,
-          latexcode
-        )
+        console.log(`[startSync] Processing doc ${i + 1}/${totalDocs}: ${doc.title} (${doc.id}, bookId: ${doc.bookId})`)
+        
+        // Download content - handle notes differently
+        let content: string
+        if (doc.bookId === NOTES_BOOK_ID) {
+          // Download note content using cached data
+          console.log(`[startSync] Downloading note content for: ${doc.id}`)
+          try {
+            content = await downloadNoteContent(doc.id)
+            console.log(`[startSync] Note content downloaded, length: ${content.length}`)
+          } catch (noteError: any) {
+            console.error(`[startSync] Failed to download note ${doc.id}:`, noteError.message)
+            throw new Error(`小记下载失败: ${noteError.message}`)
+          }
+        } else {
+          // Download regular document content
+          content = await downloadDocumentContent(
+            bookInfo.userLogin,
+            bookInfo.slug,
+            doc.slug,
+            linebreak,
+            latexcode
+          )
+        }
 
         if (shouldCancel) break
 
@@ -536,6 +749,8 @@ export async function startSync(
         const sanitizedBookName = bookInfo.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
         const filePath = path.join(syncDirectory, sanitizedBookName, `${sanitizedTitle}.md`)
         const docDir = path.dirname(filePath)
+        
+        console.log(`[startSync] Writing to: ${filePath}`)
 
         // Process images in the document content
         // Requirements: 1.1, 1.2, 1.3, 1.7

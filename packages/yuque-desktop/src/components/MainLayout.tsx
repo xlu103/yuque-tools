@@ -1,6 +1,6 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { useBooks, useSync, useSyncEvents, useToast, useIsElectron, useSettings } from '../hooks'
-import type { Session, SyncProgress } from '../hooks'
+import type { Session, SyncProgress, Document } from '../hooks'
 import { useBooksStore, useSyncStore } from '../stores'
 import { MacSidebar, SidebarSection, SidebarItem } from './ui/MacSidebar'
 import { MacToolbar, ToolbarGroup, ToolbarDivider, ToolbarTitle } from './ui/MacToolbar'
@@ -11,6 +11,9 @@ import { DocumentList } from './DocumentList'
 import { SettingsPanel } from './SettingsPanel'
 import { SyncHistoryPanel } from './SyncHistoryPanel'
 
+// Notes book ID constant
+const NOTES_BOOK_ID = '__notes__'
+
 interface MainLayoutProps {
   session: Session
   onLogout: () => void
@@ -18,7 +21,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const isElectron = useIsElectron()
-  const { listBooks, getBookDocs } = useBooks()
+  const { listBooks, getBookDocs, loadMoreNotes, getAllNotesForSync } = useBooks()
   const { startSync, cancelSync } = useSync()
   const { getSettings } = useSettings()
   const { showToast } = useToast()
@@ -46,6 +49,10 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [showSettings, setShowSettings] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  
+  // Notes lazy loading state
+  const [notesHasMore, setNotesHasMore] = useState(true)
+  const [notesLoading, setNotesLoading] = useState(false)
   
   // Auto sync timer ref
   const autoSyncTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -192,6 +199,11 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     try {
       const docs = await getBookDocs(bookId)
       setDocuments(bookId, docs)
+      
+      // Reset notes lazy loading state when switching to notes book
+      if (bookId === NOTES_BOOK_ID) {
+        setNotesHasMore(true)
+      }
     } catch (error) {
       showToast('error', '获取文档列表失败')
       console.error('Failed to load documents:', error)
@@ -199,6 +211,33 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       setLoadingDocs(false)
     }
   }, [getBookDocs, setDocuments, setLoadingDocs, showToast])
+
+  // Load more notes (lazy loading)
+  const handleLoadMoreNotes = useCallback(async () => {
+    if (selectedBookId !== NOTES_BOOK_ID || notesLoading || !notesHasMore) {
+      return
+    }
+    
+    const currentDocs = getDocumentsForBook(NOTES_BOOK_ID)
+    const offset = currentDocs.length
+    
+    setNotesLoading(true)
+    try {
+      const result = await loadMoreNotes(offset, 20)
+      
+      // Append new notes to existing ones
+      const newDocs = [...currentDocs, ...result.notes]
+      setDocuments(NOTES_BOOK_ID, newDocs)
+      setNotesHasMore(result.hasMore)
+      
+      console.log(`Loaded ${result.notes.length} more notes, hasMore: ${result.hasMore}`)
+    } catch (error) {
+      console.error('Failed to load more notes:', error)
+      showToast('error', '加载更多小记失败')
+    } finally {
+      setNotesLoading(false)
+    }
+  }, [selectedBookId, notesLoading, notesHasMore, getDocumentsForBook, loadMoreNotes, setDocuments, showToast])
 
   // Handle sync events
   useSyncEvents({
@@ -234,12 +273,18 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
 
     setRunning(true)
     try {
+      // For notes book, fetch all notes first before syncing
+      if (selectedBookId === NOTES_BOOK_ID) {
+        showToast('info', '正在获取所有小记...')
+        await getAllNotesForSync()
+      }
+      
       await startSync({ bookIds: [selectedBookId], force })
     } catch (error) {
       setRunning(false)
       showToast('error', '启动同步失败')
     }
-  }, [selectedBookId, startSync, setRunning, showToast])
+  }, [selectedBookId, startSync, setRunning, showToast, getAllNotesForSync])
 
   // Handle global sync (sync all books)
   const handleGlobalSync = useCallback(async (force = false) => {
@@ -250,13 +295,20 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
 
     setRunning(true)
     try {
+      // Check if notes book is included, fetch all notes first
+      const hasNotesBook = books.some(b => b.id === NOTES_BOOK_ID)
+      if (hasNotesBook) {
+        showToast('info', '正在获取所有小记...')
+        await getAllNotesForSync()
+      }
+      
       const allBookIds = books.map(b => b.id)
       await startSync({ bookIds: allBookIds, force })
     } catch (error) {
       setRunning(false)
       showToast('error', '启动全局同步失败')
     }
-  }, [books, startSync, setRunning, showToast])
+  }, [books, startSync, setRunning, showToast, getAllNotesForSync])
 
   // Handle cancel sync
   const handleCancelSync = useCallback(async () => {
@@ -450,6 +502,9 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             documents={filteredDocs}
             loading={isLoadingDocs}
             emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
+            onLoadMore={selectedBookId === NOTES_BOOK_ID ? handleLoadMoreNotes : undefined}
+            hasMore={selectedBookId === NOTES_BOOK_ID ? notesHasMore : false}
+            loadingMore={notesLoading}
           />
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react'
 import type { Document } from '../hooks'
 import { useDebounce } from '../hooks'
 
@@ -9,6 +9,10 @@ interface DocumentListProps {
   selectedIds?: Set<string>
   onSelectionChange?: (ids: Set<string>) => void
   selectable?: boolean
+  // Lazy loading props
+  onLoadMore?: () => void
+  hasMore?: boolean
+  loadingMore?: boolean
 }
 
 const statusConfig = {
@@ -26,10 +30,40 @@ export function DocumentList({
   emptyMessage = '暂无文档',
   selectedIds = new Set(),
   onSelectionChange,
-  selectable = false
+  selectable = false,
+  onLoadMore,
+  hasMore = false,
+  loadingMore = false
 }: DocumentListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const debouncedSearch = useDebounce(searchQuery, 200)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // Scroll handler for lazy loading
+  useEffect(() => {
+    if (!onLoadMore || !hasMore || loadingMore) return
+    
+    const listElement = listRef.current
+    if (!listElement) return
+    
+    let isLoading = false
+    
+    const handleScroll = () => {
+      if (isLoading) return
+      
+      const { scrollTop, scrollHeight, clientHeight } = listElement
+      // Load more when scrolled to bottom (with 100px threshold)
+      if (scrollHeight - scrollTop - clientHeight < 100) {
+        isLoading = true
+        onLoadMore()
+        // Reset after a short delay to prevent rapid re-triggering
+        setTimeout(() => { isLoading = false }, 500)
+      }
+    }
+    
+    listElement.addEventListener('scroll', handleScroll)
+    return () => listElement.removeEventListener('scroll', handleScroll)
+  }, [onLoadMore, hasMore, loadingMore])
 
   // Filter by search query (debounced)
   const filteredDocs = useMemo(() => {
@@ -129,7 +163,7 @@ export function DocumentList({
       )}
 
       {/* Document list */}
-      <div className="flex-1 overflow-auto divide-y divide-border-light">
+      <div ref={listRef} className="flex-1 overflow-auto divide-y divide-border-light">
         {filteredDocs.map((doc) => {
           const status = statusConfig[doc.syncStatus]
           const isSelected = selectedIds.has(doc.id)
@@ -196,6 +230,26 @@ export function DocumentList({
             </div>
           )
         })}
+        
+        {/* Load more indicator */}
+        {loadingMore && (
+          <div className="px-4 py-3 flex items-center justify-center">
+            <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+            <span className="ml-2 text-sm text-text-secondary">加载更多...</span>
+          </div>
+        )}
+        
+        {/* Load more button (fallback) */}
+        {hasMore && !loadingMore && onLoadMore && (
+          <div className="px-4 py-3 flex items-center justify-center">
+            <button
+              onClick={onLoadMore}
+              className="text-sm text-accent hover:text-accent-hover"
+            >
+              加载更多
+            </button>
+          </div>
+        )}
       </div>
 
       {/* No results */}

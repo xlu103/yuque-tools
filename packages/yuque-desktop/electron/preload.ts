@@ -23,6 +23,10 @@ const electronAPI: IPCInvokeAPI & IPCEventAPI = {
   'books:list': () => ipcRenderer.invoke('books:list'),
   'books:getDocs': (bookId) => ipcRenderer.invoke('books:getDocs', bookId),
 
+  // Notes (小记)
+  'notes:loadMore': (offset, limit) => ipcRenderer.invoke('notes:loadMore', offset, limit),
+  'notes:getAllForSync': () => ipcRenderer.invoke('notes:getAllForSync'),
+
   // Sync
   'sync:start': (options) => ipcRenderer.invoke('sync:start', options),
   'sync:cancel': () => ipcRenderer.invoke('sync:cancel'),
