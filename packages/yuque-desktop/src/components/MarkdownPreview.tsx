@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
 import { MacButton } from './ui/MacButton'
 import { useIsElectron } from '../hooks'
 
@@ -11,6 +12,27 @@ interface MarkdownPreviewProps {
   onOpenExternal?: () => void
   onShowInFolder?: () => void
   isPanel?: boolean  // 是否为边栏模式
+}
+
+// 检测内容是否主要是 HTML（包含大量 HTML 标签）
+function isHtmlContent(content: string): boolean {
+  // 检测是否包含 HTML 特有的标签或属性
+  const htmlPatterns = [
+    /<font\s+style=/i,
+    /<span\s+style=/i,
+    /<div\s+style=/i,
+    /style="[^"]*color:/i,
+    /style="[^"]*background/i,
+  ]
+  return htmlPatterns.some(pattern => pattern.test(content))
+}
+
+// 处理 HTML 内容中的相对路径图片
+function processHtmlImages(html: string, baseDir: string): string {
+  return html.replace(
+    /(<img[^>]*\ssrc=["'])(?!http|data:|file:\/\/)([^"']+)(["'][^>]*>)/gi,
+    `$1file://${baseDir}/$2$3`
+  )
 }
 
 export function MarkdownPreview({ 
@@ -25,6 +47,11 @@ export function MarkdownPreview({
   const [content, setContent] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // 获取文件所在目录，用于处理相对路径
+  const fileDir = useMemo(() => {
+    return filePath.substring(0, filePath.lastIndexOf('/'))
+  }, [filePath])
 
   // Load file content
   const loadContent = useCallback(async () => {
@@ -52,10 +79,29 @@ export function MarkdownPreview({
     loadContent()
   }, [loadContent])
 
+  // 处理图片路径，将相对路径转换为 file:// 协议
+  const processImageSrc = useCallback((src: string | undefined): string => {
+    if (!src) return ''
+    if (src.startsWith('http') || src.startsWith('data:') || src.startsWith('file://')) {
+      return src
+    }
+    // 相对路径转换为绝对路径
+    return `file://${fileDir}/${src}`
+  }, [fileDir])
+
+  // 判断是否使用 HTML 渲染
+  const useHtmlRender = useMemo(() => isHtmlContent(content), [content])
+  
+  // 处理后的 HTML 内容
+  const processedHtml = useMemo(() => {
+    if (!useHtmlRender) return ''
+    return processHtmlImages(content, fileDir)
+  }, [content, fileDir, useHtmlRender])
+
   return (
     <div className={`flex flex-col bg-bg-primary ${isPanel ? 'h-full' : 'h-screen w-screen'}`}>
       {/* Header */}
-      <div className={`flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-secondary ${isPanel ? '' : ''}`}>
+      <div className={`flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-secondary`}>
         {!isPanel && (
           <div className="pl-16">
             <MacButton variant="ghost" size="sm" onClick={onClose}>
@@ -133,37 +179,37 @@ export function MarkdownPreview({
               重试
             </MacButton>
           </div>
+        ) : useHtmlRender ? (
+          // HTML 渲染模式 - 直接渲染 HTML 以保留内联样式
+          <article 
+            className="markdown-body p-6 max-w-4xl mx-auto prose prose-slate dark:prose-invert"
+            dangerouslySetInnerHTML={{ __html: processedHtml }}
+          />
         ) : (
-          <article className="markdown-body p-6 max-w-4xl mx-auto">
+          // Markdown 渲染模式
+          <article className="markdown-body p-6 max-w-4xl mx-auto prose prose-slate dark:prose-invert">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeRaw]}
               components={{
                 // 自定义图片渲染，处理相对路径
-                img: ({ src, alt, ...props }) => {
-                  // 如果是相对路径，转换为绝对路径
-                  let imgSrc = src || ''
-                  if (imgSrc && !imgSrc.startsWith('http') && !imgSrc.startsWith('data:')) {
-                    // 获取文件所在目录
-                    const fileDir = filePath.substring(0, filePath.lastIndexOf('/'))
-                    imgSrc = `file://${fileDir}/${imgSrc}`
-                  }
-                  return <img src={imgSrc} alt={alt} {...props} className="max-w-full h-auto rounded" />
-                },
+                img: ({ src, alt, ...props }) => (
+                  <img 
+                    src={processImageSrc(src)} 
+                    alt={alt} 
+                    {...props} 
+                    className="max-w-full h-auto rounded" 
+                    loading="lazy"
+                  />
+                ),
                 // 自定义链接渲染
                 a: ({ href, children, ...props }) => (
                   <a 
                     href={href} 
                     {...props} 
                     className="text-accent hover:underline"
-                    onClick={(e) => {
-                      if (href && href.startsWith('http') && window.electronAPI) {
-                        e.preventDefault()
-                        window.electronAPI['file:openInYuque']({ userLogin: '', bookSlug: '', docSlug: '' })
-                          .catch(() => {})
-                        // 使用 shell.openExternal 打开外部链接
-                        // 这里简化处理，直接用 window.open
-                      }
-                    }}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
                     {children}
                   </a>
@@ -173,7 +219,7 @@ export function MarkdownPreview({
                   const isInline = !className
                   if (isInline) {
                     return (
-                      <code className="px-1.5 py-0.5 bg-bg-tertiary rounded text-sm font-mono" {...props}>
+                      <code className="px-1.5 py-0.5 bg-bg-tertiary rounded text-sm font-mono text-red-600" {...props}>
                         {children}
                       </code>
                     )
@@ -216,14 +262,19 @@ export function MarkdownPreview({
                 ),
                 // 列表样式
                 ul: ({ children, ...props }) => (
-                  <ul className="list-disc list-inside my-2 space-y-1" {...props}>
+                  <ul className="list-disc pl-6 my-2 space-y-1" {...props}>
                     {children}
                   </ul>
                 ),
                 ol: ({ children, ...props }) => (
-                  <ol className="list-decimal list-inside my-2 space-y-1" {...props}>
+                  <ol className="list-decimal pl-6 my-2 space-y-1" {...props}>
                     {children}
                   </ol>
+                ),
+                li: ({ children, ...props }) => (
+                  <li className="leading-relaxed" {...props}>
+                    {children}
+                  </li>
                 ),
                 // 标题样式
                 h1: ({ children, ...props }) => (
@@ -270,7 +321,7 @@ export function MarkdownPreview({
                     )
                   }
                   return <input type={type} {...props} />
-                }
+                },
               }}
             >
               {content}
