@@ -4,7 +4,7 @@
  */
 
 import { getDatabase } from '../index'
-import type { SyncSessionRecord, SyncSessionInput, SyncSessionUpdate } from './types'
+import type { SyncSessionRecord, SyncSessionInput } from './types'
 
 /**
  * Create a new sync session

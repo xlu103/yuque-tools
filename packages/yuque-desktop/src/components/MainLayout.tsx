@@ -8,6 +8,7 @@ import { MacButton } from './ui/MacButton'
 import { MacProgress } from './ui/MacProgress'
 import { BookList } from './BookList'
 import { DocumentList } from './DocumentList'
+import { DocumentTree } from './DocumentTree'
 import { SettingsPanel } from './SettingsPanel'
 import { SyncHistoryPanel } from './SyncHistoryPanel'
 import { StatisticsPanel } from './StatisticsPanel'
@@ -53,6 +54,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [showHistory, setShowHistory] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'tree'>('tree') // Default to tree view
   
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
@@ -571,6 +573,38 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
               <option value="failed">同步失败 ({statusCounts.failed || 0})</option>
             </select>
           </ToolbarGroup>
+          
+          <ToolbarDivider />
+          
+          {/* View mode toggle */}
+          <ToolbarGroup>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 rounded transition-colors ${
+                viewMode === 'list' 
+                  ? 'bg-accent/10 text-accent' 
+                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-secondary'
+              }`}
+              title="列表视图"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <button
+              onClick={() => setViewMode('tree')}
+              className={`p-1.5 rounded transition-colors ${
+                viewMode === 'tree' 
+                  ? 'bg-accent/10 text-accent' 
+                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-secondary'
+              }`}
+              title="树形视图"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+              </svg>
+            </button>
+          </ToolbarGroup>
 
           <div className="flex-1" />
 
@@ -633,25 +667,42 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
 
         {/* Document list */}
         <div className="flex-1 overflow-auto">
-          <DocumentList
-            documents={filteredDocs}
-            loading={isLoadingDocs}
-            emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
-            onLoadMore={selectedBookId === NOTES_BOOK_ID ? handleLoadMoreNotes : undefined}
-            hasMore={selectedBookId === NOTES_BOOK_ID ? notesHasMore : false}
-            loadingMore={notesLoading}
-            bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
-            onPreview={(doc) => {
-              if (doc.localPath) {
-                // 第一次打开预览时扩展窗口宽度
-                if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
-                  window.electronAPI['window:expandWidth'](500)
-                  setHasExpandedForPreview(true)
+          {viewMode === 'tree' ? (
+            <DocumentTree
+              documents={filteredDocs}
+              loading={isLoadingDocs}
+              emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
+              bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
+              onPreview={(doc) => {
+                if (doc.localPath) {
+                  if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
+                    window.electronAPI['window:expandWidth'](500)
+                    setHasExpandedForPreview(true)
+                  }
+                  setPreviewDoc({ filePath: doc.localPath, title: doc.title })
                 }
-                setPreviewDoc({ filePath: doc.localPath, title: doc.title })
-              }
-            }}
-          />
+              }}
+            />
+          ) : (
+            <DocumentList
+              documents={filteredDocs}
+              loading={isLoadingDocs}
+              emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
+              onLoadMore={selectedBookId === NOTES_BOOK_ID ? handleLoadMoreNotes : undefined}
+              hasMore={selectedBookId === NOTES_BOOK_ID ? notesHasMore : false}
+              loadingMore={notesLoading}
+              bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
+              onPreview={(doc) => {
+                if (doc.localPath) {
+                  if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
+                    window.electronAPI['window:expandWidth'](500)
+                    setHasExpandedForPreview(true)
+                  }
+                  setPreviewDoc({ filePath: doc.localPath, title: doc.title })
+                }
+              }}
+            />
+          )}
         </div>
       </div>
 

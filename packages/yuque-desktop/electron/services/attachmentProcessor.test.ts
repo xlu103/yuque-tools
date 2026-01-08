@@ -9,7 +9,6 @@ import { describe, it, expect } from 'vitest'
 import * as fc from 'fast-check'
 import {
   extractAttachmentUrls,
-  isAttachmentUrl,
   extractFilenameFromUrl,
   extractFilenameFromDisplayText,
   generateUniqueAttachmentFilename,
@@ -321,7 +320,7 @@ describe('Attachment Processor Property Tests', () => {
           yuqueAttachmentUrlArb,
           filenameArb,
           filenameArb,
-          (urlToReplace, urlToKeep, displayText, localFilename) => {
+          (urlToReplace, urlToKeep, _displayText, localFilename) => {
             // Skip if URLs are the same
             fc.pre(urlToReplace !== urlToKeep)
             

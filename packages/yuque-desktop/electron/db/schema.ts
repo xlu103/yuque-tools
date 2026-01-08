@@ -3,7 +3,7 @@
  * SQLite schema for Meta Store - stores document metadata, sync history, and settings
  */
 
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 /**
  * SQL statements to create all tables
@@ -32,6 +32,12 @@ CREATE TABLE IF NOT EXISTS documents (
   book_id TEXT NOT NULL,
   slug TEXT NOT NULL,
   title TEXT NOT NULL,
+  uuid TEXT,
+  parent_uuid TEXT,
+  child_uuid TEXT,
+  doc_type TEXT DEFAULT 'DOC' CHECK(doc_type IN ('DOC', 'TITLE')),
+  depth INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0,
   local_path TEXT,
   remote_updated_at TEXT,
   local_synced_at TEXT,
@@ -88,6 +94,8 @@ CREATE TABLE IF NOT EXISTS settings (
 -- Indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_documents_book_id ON documents(book_id);
 CREATE INDEX IF NOT EXISTS idx_documents_sync_status ON documents(sync_status);
+CREATE INDEX IF NOT EXISTS idx_documents_parent_uuid ON documents(parent_uuid);
+CREATE INDEX IF NOT EXISTS idx_documents_uuid ON documents(uuid);
 CREATE INDEX IF NOT EXISTS idx_sync_history_started_at ON sync_history(started_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sync_sessions_status ON sync_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_resources_doc_id ON resources(doc_id);
@@ -174,6 +182,36 @@ CREATE TABLE IF NOT EXISTS resources (
 CREATE INDEX IF NOT EXISTS idx_sync_sessions_status ON sync_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_resources_doc_id ON resources(doc_id);
 CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type);
+`
+
+/**
+ * Migration SQL for version 5: Add document hierarchy fields
+ */
+export const MIGRATION_V5_SQL = `
+-- Add hierarchy fields to documents table (only if they don't exist)
+-- SQLite doesn't have IF NOT EXISTS for ALTER TABLE ADD COLUMN, so we check first
+
+-- Add uuid column
+ALTER TABLE documents ADD COLUMN uuid TEXT;
+
+-- Add parent_uuid column
+ALTER TABLE documents ADD COLUMN parent_uuid TEXT;
+
+-- Add child_uuid column
+ALTER TABLE documents ADD COLUMN child_uuid TEXT;
+
+-- Add doc_type column with default
+ALTER TABLE documents ADD COLUMN doc_type TEXT DEFAULT 'DOC';
+
+-- Add depth column with default
+ALTER TABLE documents ADD COLUMN depth INTEGER DEFAULT 0;
+
+-- Add sort_order column with default
+ALTER TABLE documents ADD COLUMN sort_order INTEGER DEFAULT 0;
+
+-- Create indexes for hierarchy queries
+CREATE INDEX IF NOT EXISTS idx_documents_parent_uuid ON documents(parent_uuid);
+CREATE INDEX IF NOT EXISTS idx_documents_uuid ON documents(uuid);
 `
 
 /**

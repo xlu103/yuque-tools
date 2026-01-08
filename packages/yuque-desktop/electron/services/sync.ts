@@ -21,13 +21,8 @@ import {
   cancelSyncHistory
 } from '../db/stores/syncHistory'
 import {
-  createSyncSession,
-  getSyncSessionById,
   getInterruptedSession,
-  getRunningSession,
-  markDocCompleted,
   updateSyncSessionStatus,
-  getCompletedDocIds,
   markRunningSessonsAsInterrupted
 } from '../db/stores/syncSessions'
 import { getAppSettings } from '../db/stores/settings'
@@ -35,7 +30,7 @@ import type { Document, ChangeSet, SyncProgress, SyncResult, SyncOptions } from 
 import type { DocumentRecord } from '../db/stores/types'
 import { processDocumentImages } from './imageProcessor'
 import { processDocumentAttachments } from './attachmentProcessor'
-import { NOTES_BOOK_ID, NOTES_BOOK_NAME, getNotes, getCachedNoteContent } from './books'
+import { NOTES_BOOK_ID, getNotes, getCachedNoteContent } from './books'
 
 // Yuque API configuration
 const YUQUE_CONFIG = {

@@ -51,8 +51,7 @@ import {
   getSyncStatus,
   getChangesForBooks,
   getInterruptedSyncSession,
-  clearInterruptedSession,
-  markRunningSessionsAsInterrupted
+  clearInterruptedSession
 } from '../services/sync'
 import {
   openFile,
@@ -144,8 +143,23 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
   ipcMain.handle('books:getDocs', async (_event, bookId: string): Promise<Document[]> => {
     console.log('books:getDocs called for:', bookId)
     try {
-      // Fetch documents from Yuque API
-      const docs = await getDocsOfBook(bookId)
+      // Get book info from database to pass to getDocsOfBook
+      let bookInfo: { userLogin: string; slug: string } | undefined
+      
+      if (bookId !== '__notes__') {
+        const books = getAllBooks()
+        const book = books.find(b => b.id === bookId)
+        if (book) {
+          bookInfo = {
+            userLogin: book.user_login,
+            slug: book.slug
+          }
+          console.log(`[books:getDocs] Found book info: ${bookInfo.userLogin}/${bookInfo.slug}`)
+        }
+      }
+      
+      // Fetch documents from Yuque API (with hierarchy if possible)
+      const docs = await getDocsOfBook(bookId, bookInfo)
       
       // Check existing documents in Meta Store to preserve sync status
       const existingDocs = getDocumentsByBookId(bookId)
@@ -163,16 +177,14 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
         }
       }
       
-      // Prepare document inputs, preserving existing sync status where applicable
-      const docInputs: DocumentInput[] = docs.map((doc) => {
+      // Map documents to DocumentInput format with preserved sync status
+      const docsToStore: DocumentInput[] = docs.map((doc) => {
         const existing = existingDocsMap.get(doc.id)
         let syncStatus: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed' = 'new'
         
         if (existing) {
-          // Document exists locally
+          // Preserve failed status for regular books, but reset for notes
           if (existing.sync_status === 'failed') {
-            // For notes, reset failed status to 'new' to allow retry
-            // For regular docs, preserve failed status
             if (isNotesBook) {
               syncStatus = 'new'
               console.log(`[books:getDocs] Resetting failed note to 'new': ${doc.title} (id: ${doc.id})`)
@@ -181,15 +193,7 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
               console.log(`[books:getDocs] Preserving failed status for doc: ${doc.title} (id: ${doc.id})`)
             }
           } else if (existing.sync_status === 'synced') {
-            // Check if remote has been updated
-            const remoteTime = new Date(doc.remoteUpdatedAt).getTime()
-            const localTime = existing.local_synced_at 
-              ? new Date(existing.local_synced_at).getTime() 
-              : 0
-            syncStatus = remoteTime > localTime ? 'modified' : 'synced'
-          } else {
-            // Preserve existing status (pending, new, deleted)
-            syncStatus = existing.sync_status
+            syncStatus = 'synced'
           }
         }
         
@@ -198,58 +202,49 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
           bookId: doc.bookId,
           slug: doc.slug,
           title: doc.title,
+          uuid: doc.uuid,
+          parentUuid: doc.parentUuid,
+          childUuid: doc.childUuid,
+          docType: doc.docType,
+          depth: doc.depth,
+          sortOrder: doc.sortOrder,
           remoteUpdatedAt: doc.remoteUpdatedAt,
-          localPath: existing?.local_path || undefined,
-          localSyncedAt: existing?.local_synced_at || undefined,
-          syncStatus
+          syncStatus: syncStatus
         }
       })
       
-      // Log status summary before upsert
-      const statusSummary = docInputs.reduce((acc, d) => {
-        acc[d.syncStatus || 'unknown'] = (acc[d.syncStatus || 'unknown'] || 0) + 1
+      // Log status summary
+      const statusSummary = docsToStore.reduce((acc, doc) => {
+        acc[doc.syncStatus!] = (acc[doc.syncStatus!] || 0) + 1
         return acc
       }, {} as Record<string, number>)
       console.log(`[books:getDocs] Status summary before upsert:`, statusSummary)
       
-      // Store in Meta Store
-      upsertDocuments(docInputs)
-      
-      // Update book document count (skip for notes virtual book)
-      if (bookId !== '__notes__') {
-        updateBookDocCount(bookId, docs.length)
+      // For notes book, ensure it exists in books table first
+      if (isNotesBook) {
+        const books = getAllBooks()
+        const notesBookExists = books.some(b => b.id === '__notes__')
+        if (!notesBookExists) {
+          console.log(`[books:getDocs] Creating notes book entry in database`)
+          // Notes book should have been created by getBookStacks, but just in case
+          upsertBooks([{
+            id: '__notes__',
+            slug: 'notes',
+            name: '小记',
+            userLogin: 'system',
+            type: 'owner',
+            docCount: docsToStore.length
+          }])
+        }
       }
       
+      // Store in Meta Store
+      upsertDocuments(docsToStore)
       console.log(`Fetched and stored ${docs.length} documents for book ${bookId}`)
       
-      // Return documents with updated sync status
-      return docInputs.map((doc) => ({
-        id: doc.id,
-        bookId: doc.bookId,
-        slug: doc.slug,
-        title: doc.title,
-        localPath: doc.localPath,
-        remoteUpdatedAt: doc.remoteUpdatedAt || '',
-        localSyncedAt: doc.localSyncedAt,
-        syncStatus: doc.syncStatus || 'new'
-      }))
+      return docs
     } catch (error) {
       console.error('Failed to fetch docs:', error)
-      // If API fails, try to return cached data from Meta Store
-      const cachedDocs = getDocumentsByBookId(bookId)
-      if (cachedDocs.length > 0) {
-        console.log(`Returning ${cachedDocs.length} cached documents`)
-        return cachedDocs.map((doc) => ({
-          id: doc.id,
-          bookId: doc.book_id,
-          slug: doc.slug,
-          title: doc.title,
-          localPath: doc.local_path || undefined,
-          remoteUpdatedAt: doc.remote_updated_at || '',
-          localSyncedAt: doc.local_synced_at || undefined,
-          syncStatus: doc.sync_status
-        }))
-      }
       throw error
     }
   })

@@ -58,6 +58,11 @@ interface YuqueDocItem {
   created_at?: string
   content_updated_at?: string
   updated_at?: string
+  uuid?: string
+  parent_uuid?: string
+  child_uuid?: string
+  type?: string
+  depth?: number
 }
 
 // Note types (小记)
@@ -71,6 +76,7 @@ interface YuqueNoteContent {
   abstract: string
 }
 
+// @ts-expect-error - Used implicitly in API response types
 interface YuqueNote {
   id: number
   slug: string
@@ -78,12 +84,6 @@ interface YuqueNote {
   content: YuqueNoteContent
   created_at?: string
   updated_at?: string
-}
-
-interface YuqueNotesResponse {
-  notes: YuqueNote[]
-  pin_notes: YuqueNote[]
-  has_more: boolean
 }
 
 // Special book ID for notes
@@ -196,10 +196,145 @@ export async function getBookStacks(): Promise<KnowledgeBase[]> {
 }
 
 /**
- * Get documents in a knowledge base
- * Adapted from yuque-tools-cli getDocsOfBooks function
+ * Crawl Yuque book page to get TOC data with hierarchy
+ * This is the same approach used by yuque-tools-cli
  */
-export async function getDocsOfBook(bookId: string): Promise<Document[]> {
+async function crawlYuqueBookPage(userLogin: string, bookSlug: string): Promise<any> {
+  const session = getValidSession()
+  if (!session) {
+    throw new Error('未登录或会话已过期')
+  }
+
+  const url = `${YUQUE_CONFIG.host}/${userLogin}/${bookSlug}`
+  console.log(`[crawlYuqueBookPage] Crawling: ${url}`)
+
+  try {
+    const response = await axios({
+      url,
+      method: 'get',
+      headers: {
+        'user-agent': YUQUE_CONFIG.userAgent,
+        cookie: session.cookies
+      }
+    })
+
+    const html = response.data
+    
+    // Method 1: Try to extract from script tag with decodeURIComponent
+    const encodedMatch = html.match(/decodeURIComponent\("(.+?)"\)\);/)
+    if (encodedMatch) {
+      try {
+        const encodedData = encodedMatch[1]
+        const decodedData = decodeURIComponent(encodedData)
+        const appData = JSON.parse(decodedData)
+        console.log(`[crawlYuqueBookPage] Successfully extracted appData (method 1)`)
+        console.log(`[crawlYuqueBookPage] Book: ${appData.book?.name}, TOC items: ${appData.book?.toc?.length || 0}`)
+        return appData
+      } catch (error) {
+        console.error('[crawlYuqueBookPage] Failed to parse encoded appData:', error)
+      }
+    }
+    
+    // Method 2: Try to extract from window.appData assignment
+    const appDataMatch = html.match(/window\.appData\s*=\s*({.+?});/s)
+    if (appDataMatch) {
+      try {
+        const appData = JSON.parse(appDataMatch[1])
+        console.log(`[crawlYuqueBookPage] Successfully extracted appData (method 2)`)
+        console.log(`[crawlYuqueBookPage] Book: ${appData.book?.name}, TOC items: ${appData.book?.toc?.length || 0}`)
+        return appData
+      } catch (error) {
+        console.error('[crawlYuqueBookPage] Failed to parse appData:', error)
+      }
+    }
+    
+    // Method 3: Try to find JSON data in script tags (alternative pattern)
+    const scriptMatch = html.match(/<script[^>]*>[\s\S]*?window\.appData\s*=\s*([\s\S]*?)<\/script>/i)
+    if (scriptMatch) {
+      try {
+        // Extract JSON from the script content
+        const scriptContent = scriptMatch[1]
+        const jsonMatch = scriptContent.match(/^(\{[\s\S]*?\});?\s*$/m)
+        if (jsonMatch) {
+          const appData = JSON.parse(jsonMatch[1])
+          console.log(`[crawlYuqueBookPage] Successfully extracted appData (method 3)`)
+          console.log(`[crawlYuqueBookPage] Book: ${appData.book?.name}, TOC items: ${appData.book?.toc?.length || 0}`)
+          return appData
+        }
+      } catch (error) {
+        console.error('[crawlYuqueBookPage] Method 3 failed:', error)
+      }
+    }
+
+    console.error('[crawlYuqueBookPage] No appData found in page')
+    return null
+  } catch (error) {
+    console.error(`[crawlYuqueBookPage] Failed to crawl page:`, error)
+    return null
+  }
+}
+
+/**
+ * Transform TOC item to Document format
+ */
+function transformTocToDocument(
+  tocItem: any,
+  bookId: string,
+  parentUuid: string | null = null,
+  depth: number = 0,
+  sortOrder: number = 0
+): Document {
+  // Generate a slug if not present (for TITLE type items)
+  const slug = tocItem.url || tocItem.slug || `folder_${tocItem.uuid || tocItem.id || sortOrder}`
+  
+  return {
+    id: String(tocItem.id || tocItem.uuid),
+    bookId: bookId,
+    slug: slug,
+    title: tocItem.title || '未命名',
+    uuid: tocItem.uuid || null,
+    parentUuid: parentUuid,
+    childUuid: tocItem.child_uuid || null,
+    docType: tocItem.type === 'TITLE' ? 'TITLE' : 'DOC',
+    depth: depth,
+    sortOrder: sortOrder,
+    remoteCreatedAt: tocItem.created_at || new Date().toISOString(),
+    remoteUpdatedAt: tocItem.content_updated_at || tocItem.updated_at || new Date().toISOString(),
+    syncStatus: 'new' as const
+  }
+}
+
+/**
+ * Flatten TOC tree to document list
+ */
+function flattenToc(
+  tocItems: any[],
+  bookId: string,
+  parentUuid: string | null = null,
+  depth: number = 0
+): Document[] {
+  const documents: Document[] = []
+  
+  tocItems.forEach((item, index) => {
+    const doc = transformTocToDocument(item, bookId, parentUuid, depth, index)
+    documents.push(doc)
+    
+    // Recursively process children
+    if (item.children && item.children.length > 0) {
+      const childDocs = flattenToc(item.children, bookId, item.uuid, depth + 1)
+      documents.push(...childDocs)
+    }
+  })
+  
+  return documents
+}
+
+/**
+ * Get documents in a knowledge base with hierarchy
+ * @param bookId - Book ID
+ * @param bookInfo - Optional book info (userLogin and slug) to avoid extra API calls
+ */
+export async function getDocsOfBook(bookId: string, bookInfo?: { userLogin: string; slug: string }): Promise<Document[]> {
   const session = getValidSession()
   if (!session) {
     throw new Error('未登录或会话已过期')
@@ -210,19 +345,76 @@ export async function getDocsOfBook(bookId: string): Promise<Document[]> {
     return getNotes()
   }
 
+  // If bookInfo not provided, try to find it
+  if (!bookInfo) {
+    const { data: bookStacksData = [] } = await yuqueGet<YuqueBookStackItem[]>(YUQUE_API.booksList)
+    const collabBooks = await getCollabBooks()
+    const allBooks = [...bookStacksData.map(stack => stack.books).flat(), ...collabBooks]
+    
+    const book = allBooks.find(b => String(b.id) === bookId)
+    if (book) {
+      bookInfo = {
+        userLogin: book.user.login,
+        slug: book.slug
+      }
+    }
+  }
+  
+  if (!bookInfo) {
+    console.warn(`[getDocsOfBook] Book info not found for ${bookId}, falling back to API method`)
+    return getDocsOfBookFromAPI(bookId)
+  }
+
+  console.log(`[getDocsOfBook] Processing book: ${bookInfo.userLogin}/${bookInfo.slug}`)
+
+  // Try to crawl page for TOC data
+  const appData = await crawlYuqueBookPage(bookInfo.userLogin, bookInfo.slug)
+  
+  if (appData && appData.book && appData.book.toc) {
+    console.log(`[getDocsOfBook] ✅ Got TOC data with ${appData.book.toc.length} items`)
+    const documents = flattenToc(appData.book.toc, bookId)
+    console.log(`[getDocsOfBook] ✅ Processed ${documents.length} documents with hierarchy from TOC`)
+    console.log(`[getDocsOfBook] 📊 Stats: ${documents.filter(d => d.parentUuid).length} with parent, ${documents.filter(d => d.docType === 'TITLE').length} folders`)
+    return documents
+  }
+
+  // Fallback to API method if crawling fails
+  console.warn(`[getDocsOfBook] ⚠️  Crawling failed, falling back to API method`)
+  return getDocsOfBookFromAPI(bookId)
+}
+
+/**
+ * Fallback method: Get documents from API (without full hierarchy)
+ */
+async function getDocsOfBookFromAPI(bookId: string): Promise<Document[]> {
   const { data: docsData = [] } = await yuqueGet<YuqueDocItem[]>(YUQUE_API.docsOfBook(bookId))
 
-  // Transform to Document format
-  const documents: Document[] = docsData.map((doc) => ({
+  console.log(`[getDocsOfBookFromAPI] Fetched ${docsData.length} documents for book ${bookId}`)
+  
+  // Log sample document to see structure
+  if (docsData.length > 0) {
+    console.log('[getDocsOfBookFromAPI] Sample document structure:', JSON.stringify(docsData[0], null, 2))
+  }
+
+  // Transform to Document format with hierarchy info
+  const documents: Document[] = docsData.map((doc, index) => ({
     id: String(doc.id),
     bookId: bookId,
     slug: doc.slug,
     title: doc.title,
+    uuid: doc.uuid || null,
+    parentUuid: doc.parent_uuid || null,
+    childUuid: doc.child_uuid || null,
+    docType: doc.type === 'TITLE' ? 'TITLE' : 'DOC',
+    depth: doc.depth ?? 0,
+    sortOrder: index, // Use API order as sort order
     remoteCreatedAt: doc.created_at || doc.updated_at || new Date().toISOString(),
     remoteUpdatedAt: doc.content_updated_at || doc.updated_at || new Date().toISOString(),
     syncStatus: 'new' as const
   }))
 
+  console.log(`[getDocsOfBookFromAPI] Processed ${documents.length} documents with hierarchy info`)
+  
   return documents
 }
 

@@ -115,6 +115,42 @@ function runMigrations(database: Database.Database): void {
           console.error('Migration v4 failed:', error)
         }
       }
+      if (currentVersion < 5) {
+        console.log('Running migration to v5: adding document hierarchy fields')
+        try {
+          // Check if columns already exist
+          const columns = database.prepare("PRAGMA table_info(documents)").all() as any[]
+          const columnNames = columns.map(c => c.name)
+          
+          // Only add columns that don't exist
+          if (!columnNames.includes('uuid')) {
+            database.exec('ALTER TABLE documents ADD COLUMN uuid TEXT;')
+          }
+          if (!columnNames.includes('parent_uuid')) {
+            database.exec('ALTER TABLE documents ADD COLUMN parent_uuid TEXT;')
+          }
+          if (!columnNames.includes('child_uuid')) {
+            database.exec('ALTER TABLE documents ADD COLUMN child_uuid TEXT;')
+          }
+          if (!columnNames.includes('doc_type')) {
+            database.exec('ALTER TABLE documents ADD COLUMN doc_type TEXT DEFAULT \'DOC\';')
+          }
+          if (!columnNames.includes('depth')) {
+            database.exec('ALTER TABLE documents ADD COLUMN depth INTEGER DEFAULT 0;')
+          }
+          if (!columnNames.includes('sort_order')) {
+            database.exec('ALTER TABLE documents ADD COLUMN sort_order INTEGER DEFAULT 0;')
+          }
+          
+          // Create indexes
+          database.exec('CREATE INDEX IF NOT EXISTS idx_documents_parent_uuid ON documents(parent_uuid);')
+          database.exec('CREATE INDEX IF NOT EXISTS idx_documents_uuid ON documents(uuid);')
+          
+          console.log('Migration v5 completed successfully')
+        } catch (error) {
+          console.error('Migration v5 failed:', error)
+        }
+      }
     }
     
     // Initialize default settings if not exists

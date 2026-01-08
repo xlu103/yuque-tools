@@ -6,7 +6,6 @@
 
 import { shell } from 'electron'
 import * as fs from 'fs'
-import * as path from 'path'
 
 /**
  * Open a local file with the system default application

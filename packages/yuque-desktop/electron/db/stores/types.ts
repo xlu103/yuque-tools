@@ -36,6 +36,12 @@ export interface DocumentRecord {
   book_id: string
   slug: string
   title: string
+  uuid: string | null
+  parent_uuid: string | null
+  child_uuid: string | null
+  doc_type: 'DOC' | 'TITLE'
+  depth: number
+  sort_order: number
   local_path: string | null
   remote_updated_at: string | null
   local_synced_at: string | null
@@ -49,6 +55,12 @@ export interface DocumentInput {
   bookId: string
   slug: string
   title: string
+  uuid?: string
+  parentUuid?: string
+  childUuid?: string
+  docType?: 'DOC' | 'TITLE'
+  depth?: number
+  sortOrder?: number
   localPath?: string
   remoteUpdatedAt?: string
   localSyncedAt?: string
@@ -56,6 +68,12 @@ export interface DocumentInput {
 }
 
 export interface DocumentUpdate {
+  uuid?: string
+  parentUuid?: string
+  childUuid?: string
+  docType?: 'DOC' | 'TITLE'
+  depth?: number
+  sortOrder?: number
   localPath?: string
   remoteUpdatedAt?: string
   localSyncedAt?: string

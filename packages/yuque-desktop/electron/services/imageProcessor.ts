@@ -8,7 +8,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as crypto from 'crypto'
 import { getValidSession } from '../db/stores/auth'
-import { createResource, getResourceByUrl, markResourceDownloaded, markResourceFailed } from '../db/stores/resources'
+import { createResource, getResourceByUrl } from '../db/stores/resources'
 
 // Yuque CDN domains
 const YUQUE_CDN_DOMAINS = [
@@ -277,7 +277,7 @@ export async function processDocumentImages(
     
     if (result) {
       // Record in database
-      const resourceId = createResource({
+      createResource({
         docId,
         type: 'image',
         remoteUrl: url,

@@ -8,6 +8,7 @@ export { FailedDocsPanel } from './FailedDocsPanel'
 // Components
 export { BookList } from './BookList'
 export { DocumentList } from './DocumentList'
+export { DocumentTree } from './DocumentTree'
 
 // UI Components
 export * from './ui'

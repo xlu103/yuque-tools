@@ -23,13 +23,28 @@ export function getDocumentById(id: string): DocumentRecord | undefined {
 }
 
 /**
- * Get documents by book ID
+ * Get documents by book ID, ordered by hierarchy
  */
 export function getDocumentsByBookId(bookId: string): DocumentRecord[] {
   const db = getDatabase()
   return db.prepare(
-    'SELECT * FROM documents WHERE book_id = ? ORDER BY title'
+    'SELECT * FROM documents WHERE book_id = ? ORDER BY sort_order, title'
   ).all(bookId) as DocumentRecord[]
+}
+
+/**
+ * Get child documents by parent UUID
+ */
+export function getDocumentsByParentUuid(parentUuid: string | null): DocumentRecord[] {
+  const db = getDatabase()
+  if (parentUuid === null) {
+    return db.prepare(
+      'SELECT * FROM documents WHERE parent_uuid IS NULL ORDER BY sort_order, title'
+    ).all() as DocumentRecord[]
+  }
+  return db.prepare(
+    'SELECT * FROM documents WHERE parent_uuid = ? ORDER BY sort_order, title'
+  ).all(parentUuid) as DocumentRecord[]
 }
 
 /**
@@ -60,12 +75,21 @@ export function getPendingDocuments(): DocumentRecord[] {
 export function upsertDocument(doc: DocumentInput): void {
   const db = getDatabase()
   db.prepare(`
-    INSERT INTO documents (id, book_id, slug, title, local_path, remote_updated_at, local_synced_at, sync_status, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO documents (
+      id, book_id, slug, title, uuid, parent_uuid, child_uuid, doc_type, depth, sort_order,
+      local_path, remote_updated_at, local_synced_at, sync_status, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       book_id = excluded.book_id,
       slug = excluded.slug,
       title = excluded.title,
+      uuid = COALESCE(excluded.uuid, documents.uuid),
+      parent_uuid = COALESCE(excluded.parent_uuid, documents.parent_uuid),
+      child_uuid = COALESCE(excluded.child_uuid, documents.child_uuid),
+      doc_type = COALESCE(excluded.doc_type, documents.doc_type),
+      depth = COALESCE(excluded.depth, documents.depth),
+      sort_order = COALESCE(excluded.sort_order, documents.sort_order),
       local_path = COALESCE(excluded.local_path, documents.local_path),
       remote_updated_at = COALESCE(excluded.remote_updated_at, documents.remote_updated_at),
       local_synced_at = COALESCE(excluded.local_synced_at, documents.local_synced_at),
@@ -76,6 +100,12 @@ export function upsertDocument(doc: DocumentInput): void {
     doc.bookId,
     doc.slug,
     doc.title,
+    doc.uuid ?? null,
+    doc.parentUuid ?? null,
+    doc.childUuid ?? null,
+    doc.docType ?? 'DOC',
+    doc.depth ?? 0,
+    doc.sortOrder ?? 0,
     doc.localPath ?? null,
     doc.remoteUpdatedAt ?? null,
     doc.localSyncedAt ?? null,
@@ -97,12 +127,21 @@ export function upsertDocuments(docs: DocumentInput[]): void {
   }
   
   const upsert = db.prepare(`
-    INSERT INTO documents (id, book_id, slug, title, local_path, remote_updated_at, local_synced_at, sync_status, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+    INSERT INTO documents (
+      id, book_id, slug, title, uuid, parent_uuid, child_uuid, doc_type, depth, sort_order,
+      local_path, remote_updated_at, local_synced_at, sync_status, updated_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
     ON CONFLICT(id) DO UPDATE SET
       book_id = excluded.book_id,
       slug = excluded.slug,
       title = excluded.title,
+      uuid = COALESCE(excluded.uuid, documents.uuid),
+      parent_uuid = COALESCE(excluded.parent_uuid, documents.parent_uuid),
+      child_uuid = COALESCE(excluded.child_uuid, documents.child_uuid),
+      doc_type = COALESCE(excluded.doc_type, documents.doc_type),
+      depth = COALESCE(excluded.depth, documents.depth),
+      sort_order = COALESCE(excluded.sort_order, documents.sort_order),
       local_path = COALESCE(excluded.local_path, documents.local_path),
       remote_updated_at = COALESCE(excluded.remote_updated_at, documents.remote_updated_at),
       local_synced_at = COALESCE(excluded.local_synced_at, documents.local_synced_at),
@@ -117,6 +156,12 @@ export function upsertDocuments(docs: DocumentInput[]): void {
         doc.bookId,
         doc.slug,
         doc.title,
+        doc.uuid ?? null,
+        doc.parentUuid ?? null,
+        doc.childUuid ?? null,
+        doc.docType ?? 'DOC',
+        doc.depth ?? 0,
+        doc.sortOrder ?? 0,
         doc.localPath ?? null,
         doc.remoteUpdatedAt ?? null,
         doc.localSyncedAt ?? null,
@@ -134,8 +179,32 @@ export function upsertDocuments(docs: DocumentInput[]): void {
 export function updateDocument(id: string, update: DocumentUpdate): void {
   const db = getDatabase()
   const sets: string[] = ['updated_at = datetime(\'now\')']
-  const values: (string | null)[] = []
+  const values: (string | number | null)[] = []
 
+  if (update.uuid !== undefined) {
+    sets.push('uuid = ?')
+    values.push(update.uuid)
+  }
+  if (update.parentUuid !== undefined) {
+    sets.push('parent_uuid = ?')
+    values.push(update.parentUuid)
+  }
+  if (update.childUuid !== undefined) {
+    sets.push('child_uuid = ?')
+    values.push(update.childUuid)
+  }
+  if (update.docType !== undefined) {
+    sets.push('doc_type = ?')
+    values.push(update.docType)
+  }
+  if (update.depth !== undefined) {
+    sets.push('depth = ?')
+    values.push(update.depth)
+  }
+  if (update.sortOrder !== undefined) {
+    sets.push('sort_order = ?')
+    values.push(update.sortOrder)
+  }
   if (update.localPath !== undefined) {
     sets.push('local_path = ?')
     values.push(update.localPath)

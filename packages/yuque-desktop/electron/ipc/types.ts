@@ -33,6 +33,12 @@ export interface Document {
   bookId: string
   slug: string
   title: string
+  uuid?: string | null
+  parentUuid?: string | null
+  childUuid?: string | null
+  docType?: 'DOC' | 'TITLE'
+  depth?: number
+  sortOrder?: number
   localPath?: string
   remoteCreatedAt?: string
   remoteUpdatedAt: string
