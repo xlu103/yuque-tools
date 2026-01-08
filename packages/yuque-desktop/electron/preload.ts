@@ -58,6 +58,9 @@ const electronAPI: IPCInvokeAPI & IPCEventAPI = {
   // Statistics (统计)
   'stats:get': () => ipcRenderer.invoke('stats:get'),
 
+  // Window operations
+  'window:expandWidth': (additionalWidth) => ipcRenderer.invoke('window:expandWidth', additionalWidth),
+
   // Event listeners
   on: (channel, callback) => {
     const subscription = (_event: Electron.IpcRendererEvent, data: unknown) => {

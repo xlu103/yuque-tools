@@ -195,10 +195,17 @@ export function DocumentList({
           return (
             <div
               key={doc.id}
-              className={`px-4 py-3 hover:bg-bg-secondary transition-colors duration-150 group ${isSelected ? 'bg-accent/5' : ''}`}
-              onClick={selectable ? () => handleToggleSelect(doc.id) : undefined}
+              className={`px-4 py-3 hover:bg-bg-secondary transition-colors duration-150 group cursor-pointer ${isSelected ? 'bg-accent/5' : ''}`}
+              onClick={() => {
+                if (selectable) {
+                  handleToggleSelect(doc.id)
+                } else if (isSynced && onPreview) {
+                  // 单击已同步的文档触发预览
+                  onPreview(doc)
+                }
+              }}
               onDoubleClick={() => {
-                // 双击预览
+                // 双击预览（保留兼容）
                 if (isSynced && onPreview) {
                   onPreview(doc)
                 }

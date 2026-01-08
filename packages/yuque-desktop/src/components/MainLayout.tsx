@@ -56,6 +56,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
+  const [hasExpandedForPreview, setHasExpandedForPreview] = useState(false)
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -399,26 +400,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     return <StatisticsPanel onClose={() => setShowStats(false)} />
   }
 
-  if (previewDoc) {
-    return (
-      <MarkdownPreview
-        filePath={previewDoc.filePath}
-        title={previewDoc.title}
-        onClose={() => setPreviewDoc(null)}
-        onOpenExternal={() => {
-          if (window.electronAPI) {
-            window.electronAPI['file:open'](previewDoc.filePath)
-          }
-        }}
-        onShowInFolder={() => {
-          if (window.electronAPI) {
-            window.electronAPI['file:showInFolder'](previewDoc.filePath)
-          }
-        }}
-      />
-    )
-  }
-
   if (showSettings) {
     return <SettingsPanel onClose={() => setShowSettings(false)} onLogout={onLogout} />
   }
@@ -662,12 +643,39 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
             onPreview={(doc) => {
               if (doc.localPath) {
+                // 第一次打开预览时扩展窗口宽度
+                if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
+                  window.electronAPI['window:expandWidth'](500)
+                  setHasExpandedForPreview(true)
+                }
                 setPreviewDoc({ filePath: doc.localPath, title: doc.title })
               }
             }}
           />
         </div>
       </div>
+
+      {/* Right Preview Panel */}
+      {previewDoc && (
+        <div className="w-[500px] border-l border-border flex flex-col bg-bg-primary">
+          <MarkdownPreview
+            filePath={previewDoc.filePath}
+            title={previewDoc.title}
+            onClose={() => setPreviewDoc(null)}
+            onOpenExternal={() => {
+              if (window.electronAPI) {
+                window.electronAPI['file:open'](previewDoc.filePath)
+              }
+            }}
+            onShowInFolder={() => {
+              if (window.electronAPI) {
+                window.electronAPI['file:showInFolder'](previewDoc.filePath)
+              }
+            }}
+            isPanel
+          />
+        </div>
+      )}
     </div>
   )
 }

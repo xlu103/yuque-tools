@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { MacButton } from './ui/MacButton'
-import { MacToolbar, ToolbarTitle } from './ui/MacToolbar'
 import { useIsElectron } from '../hooks'
 
 interface MarkdownPreviewProps {
@@ -11,6 +10,7 @@ interface MarkdownPreviewProps {
   onClose: () => void
   onOpenExternal?: () => void
   onShowInFolder?: () => void
+  isPanel?: boolean  // 是否为边栏模式
 }
 
 export function MarkdownPreview({ 
@@ -18,7 +18,8 @@ export function MarkdownPreview({
   title, 
   onClose,
   onOpenExternal,
-  onShowInFolder
+  onShowInFolder,
+  isPanel = false
 }: MarkdownPreviewProps) {
   const isElectron = useIsElectron()
   const [content, setContent] = useState<string>('')
@@ -52,41 +53,69 @@ export function MarkdownPreview({
   }, [loadContent])
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-bg-primary">
-      {/* Toolbar */}
-      <MacToolbar>
-        <div className="pl-16">
-          <MacButton variant="ghost" size="sm" onClick={onClose}>
-            <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            返回
-          </MacButton>
-        </div>
-        <ToolbarTitle>{title}</ToolbarTitle>
-        <div className="flex-1" />
-        <div className="flex items-center gap-1">
+    <div className={`flex flex-col bg-bg-primary ${isPanel ? 'h-full' : 'h-screen w-screen'}`}>
+      {/* Header */}
+      <div className={`flex items-center gap-2 px-3 py-2 border-b border-border bg-bg-secondary ${isPanel ? '' : ''}`}>
+        {!isPanel && (
+          <div className="pl-16">
+            <MacButton variant="ghost" size="sm" onClick={onClose}>
+              <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              返回
+            </MacButton>
+          </div>
+        )}
+        
+        <h3 className={`text-sm font-medium text-text-primary truncate ${isPanel ? 'flex-1' : ''}`} title={title}>
+          {title}
+        </h3>
+        
+        <div className="flex items-center gap-1 ml-auto">
           {onShowInFolder && (
-            <MacButton variant="ghost" size="sm" onClick={onShowInFolder} title="在文件夹中显示">
+            <button
+              onClick={onShowInFolder}
+              className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+              title="在文件夹中显示"
+            >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
               </svg>
-            </MacButton>
+            </button>
           )}
           {onOpenExternal && (
-            <MacButton variant="ghost" size="sm" onClick={onOpenExternal} title="用外部程序打开">
+            <button
+              onClick={onOpenExternal}
+              className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+              title="用外部程序打开"
+            >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
-            </MacButton>
+            </button>
           )}
-          <MacButton variant="ghost" size="sm" onClick={loadContent} title="刷新">
+          <button
+            onClick={loadContent}
+            className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+            title="刷新"
+          >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
-          </MacButton>
+          </button>
+          {isPanel && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+              title="关闭"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
-      </MacToolbar>
+      </div>
 
       {/* Content */}
       <div className="flex-1 overflow-auto">

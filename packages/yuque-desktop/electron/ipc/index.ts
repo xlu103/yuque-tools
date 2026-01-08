@@ -523,4 +523,17 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
     console.log('stats:get called')
     return getStatistics()
   })
+
+  // ============================================
+  // Window Handlers
+  // ============================================
+
+  ipcMain.handle('window:expandWidth', async (_event, additionalWidth: number): Promise<void> => {
+    console.log('window:expandWidth called with:', additionalWidth)
+    if (!mainWindow) return
+    
+    const [currentWidth, currentHeight] = mainWindow.getSize()
+    const newWidth = currentWidth + additionalWidth
+    mainWindow.setSize(newWidth, currentHeight, true)
+  })
 }

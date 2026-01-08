@@ -203,6 +203,9 @@ export interface IPCChannels {
 
   // Statistics (统计)
   'stats:get': () => Promise<SyncStatistics>
+
+  // Window operations
+  'window:expandWidth': (additionalWidth: number) => Promise<void>
 }
 
 /**
