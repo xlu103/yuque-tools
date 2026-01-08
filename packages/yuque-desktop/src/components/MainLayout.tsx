@@ -499,9 +499,9 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
         onResizeEnd={saveLayout}
       />
 
-      {/* Main content */}
+      {/* Main content area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Toolbar */}
+        {/* Toolbar - spans full width of main area */}
         <MacToolbar>
           {/* Search box */}
           <div className="search-container relative">
@@ -686,78 +686,81 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
           </div>
         )}
 
-        {/* Document list */}
-        <div className="flex-1 overflow-auto">
-          {viewMode === 'tree' ? (
-            <DocumentTree
-              documents={filteredDocs}
-              loading={isLoadingDocs}
-              emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
-              bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
-              bookId={selectedBookId || undefined}
-              onPreview={(doc) => {
-                if (doc.localPath) {
-                  if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
-                    window.electronAPI['window:expandWidth'](500)
-                    setHasExpandedForPreview(true)
+        {/* Document list and Preview panel in same horizontal container */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Document list */}
+          <div className="flex-1 overflow-auto">
+            {viewMode === 'tree' ? (
+              <DocumentTree
+                documents={filteredDocs}
+                loading={isLoadingDocs}
+                emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
+                bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
+                bookId={selectedBookId || undefined}
+                onPreview={(doc) => {
+                  if (doc.localPath) {
+                    if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
+                      window.electronAPI['window:expandWidth'](500)
+                      setHasExpandedForPreview(true)
+                    }
+                    setPreviewDoc({ filePath: doc.localPath, title: doc.title })
                   }
-                  setPreviewDoc({ filePath: doc.localPath, title: doc.title })
-                }
-              }}
-            />
-          ) : (
-            <DocumentList
-              documents={filteredDocs}
-              loading={isLoadingDocs}
-              emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
-              onLoadMore={selectedBookId === NOTES_BOOK_ID ? handleLoadMoreNotes : undefined}
-              hasMore={selectedBookId === NOTES_BOOK_ID ? notesHasMore : false}
-              loadingMore={notesLoading}
-              bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
-              onPreview={(doc) => {
-                if (doc.localPath) {
-                  if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
-                    window.electronAPI['window:expandWidth'](500)
-                    setHasExpandedForPreview(true)
+                }}
+              />
+            ) : (
+              <DocumentList
+                documents={filteredDocs}
+                loading={isLoadingDocs}
+                emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
+                onLoadMore={selectedBookId === NOTES_BOOK_ID ? handleLoadMoreNotes : undefined}
+                hasMore={selectedBookId === NOTES_BOOK_ID ? notesHasMore : false}
+                loadingMore={notesLoading}
+                bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
+                onPreview={(doc) => {
+                  if (doc.localPath) {
+                    if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
+                      window.electronAPI['window:expandWidth'](500)
+                      setHasExpandedForPreview(true)
+                    }
+                    setPreviewDoc({ filePath: doc.localPath, title: doc.title })
                   }
-                  setPreviewDoc({ filePath: doc.localPath, title: doc.title })
-                }
-              }}
+                }}
+              />
+            )}
+          </div>
+
+          {/* Preview Panel Resizer */}
+          {previewDoc && (
+            <PanelResizer
+              direction="horizontal"
+              onResize={(delta) => setPreviewWidth(previewWidth - delta)}
+              onResizeEnd={saveLayout}
             />
+          )}
+
+          {/* Right Preview Panel */}
+          {previewDoc && (
+            <div style={{ width: previewWidth }} className="flex-shrink-0 border-l border-border flex flex-col bg-bg-primary">
+              <MarkdownPreview
+                filePath={previewDoc.filePath}
+                title={previewDoc.title}
+                onClose={() => setPreviewDoc(null)}
+                onOpenExternal={() => {
+                  if (window.electronAPI) {
+                    window.electronAPI['file:open'](previewDoc.filePath)
+                  }
+                }}
+                onShowInFolder={() => {
+                  if (window.electronAPI) {
+                    window.electronAPI['file:showInFolder'](previewDoc.filePath)
+                  }
+                }}
+                isPanel
+              />
+            </div>
           )}
         </div>
       </div>
-
-      {/* Preview Panel Resizer */}
-      {previewDoc && (
-        <PanelResizer
-          direction="horizontal"
-          onResize={(delta) => setPreviewWidth(previewWidth - delta)}
-          onResizeEnd={saveLayout}
-        />
-      )}
-
-      {/* Right Preview Panel */}
-      {previewDoc && (
-        <div style={{ width: previewWidth }} className="flex-shrink-0 border-l border-border flex flex-col bg-bg-primary">
-          <MarkdownPreview
-            filePath={previewDoc.filePath}
-            title={previewDoc.title}
-            onClose={() => setPreviewDoc(null)}
-            onOpenExternal={() => {
-              if (window.electronAPI) {
-                window.electronAPI['file:open'](previewDoc.filePath)
-              }
-            }}
-            onShowInFolder={() => {
-              if (window.electronAPI) {
-                window.electronAPI['file:showInFolder'](previewDoc.filePath)
-              }
-            }}
-            isPanel
-          />
-        </div>
-      )}
     </div>
   )
 }
