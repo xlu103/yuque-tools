@@ -33,28 +33,36 @@ const statusConfig = {
  * Build tree structure from flat document list
  */
 function buildDocumentTree(documents: Document[]): TreeNode[] {
-  // Create a map for quick lookup
-  const docMap = new Map<string, TreeNode>()
+  // Create maps for quick lookup - index by both uuid and id
+  const nodesByUuid = new Map<string, TreeNode>()
+  const nodesById = new Map<string, TreeNode>()
   const rootNodes: TreeNode[] = []
 
-  // First pass: create all nodes
+  // First pass: create all nodes and index them
   documents.forEach(doc => {
-    const nodeId = doc.uuid || doc.id
-    docMap.set(nodeId, {
+    const node: TreeNode = {
       ...doc,
       children: [],
       level: doc.depth || 0
-    })
+    }
+    
+    // Index by id (always available)
+    nodesById.set(doc.id, node)
+    
+    // Also index by uuid if available
+    if (doc.uuid) {
+      nodesByUuid.set(doc.uuid, node)
+    }
   })
 
   // Second pass: build tree structure
   documents.forEach(doc => {
-    const nodeId = doc.uuid || doc.id
-    const node = docMap.get(nodeId)
+    const node = nodesById.get(doc.id)
     if (!node) return
 
     if (doc.parentUuid) {
-      const parent = docMap.get(doc.parentUuid)
+      // Try to find parent by uuid first, then by id
+      const parent = nodesByUuid.get(doc.parentUuid) || nodesById.get(doc.parentUuid)
       if (parent) {
         parent.children.push(node)
       } else {
@@ -114,7 +122,7 @@ function DocumentTreeNode({
   const hasChildren = node.children.length > 0
   const isSynced = node.syncStatus === 'synced' && node.localPath
   const status = statusConfig[node.syncStatus]
-  const isFolder = node.docType === 'TITLE'
+  const isFolder = node.docType === 'TITLE' || hasChildren  // 有子节点也算文件夹
   const { isCollapsed: checkCollapsed, toggleNode, saveCollapseState } = useTreeCollapseStore()
 
   return (
@@ -127,22 +135,25 @@ function DocumentTreeNode({
         onClick={() => {
           if (selectable) {
             onToggleSelect(node.id)
+          } else if (hasChildren) {
+            // 单击有子节点的项目直接折叠/展开
+            onToggleCollapse()
           } else if (isSynced && onPreview && !isFolder) {
             onPreview(node)
           }
         }}
       >
-        {/* Expand/collapse button */}
+        {/* Expand/collapse indicator - 点击可折叠 */}
         {hasChildren ? (
           <button
             onClick={(e) => {
               e.stopPropagation()
               onToggleCollapse()
             }}
-            className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-text-tertiary hover:text-text-primary mt-0.5"
+            className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded mt-0.5"
           >
             <svg
-              className={`w-3 h-3 transition-transform ${!isCollapsed ? 'rotate-90' : ''}`}
+              className={`w-4 h-4 transition-transform duration-200 ${!isCollapsed ? 'rotate-90' : ''}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -151,7 +162,7 @@ function DocumentTreeNode({
             </svg>
           </button>
         ) : (
-          <div className="flex-shrink-0 w-4 h-4" />
+          <div className="flex-shrink-0 w-5 h-5" />
         )}
 
         {/* Checkbox */}
@@ -302,8 +313,7 @@ function DocumentTreeNode({
       {hasChildren && !isCollapsed && (
         <div>
           {node.children.map((child) => {
-            const childNodeId = child.uuid || child.id
-            const childIsCollapsed = bookId ? checkCollapsed(bookId, childNodeId) : false
+            const childIsCollapsed = bookId ? checkCollapsed(bookId, child.id) : false
             return (
               <DocumentTreeNode
                 key={child.id}
@@ -321,7 +331,7 @@ function DocumentTreeNode({
                 isCollapsed={childIsCollapsed}
                 onToggleCollapse={() => {
                   if (bookId) {
-                    toggleNode(bookId, childNodeId)
+                    toggleNode(bookId, child.id)
                     saveCollapseState(bookId)
                   }
                 }}
@@ -356,15 +366,17 @@ export function DocumentTree({
   } = useTreeCollapseStore()
 
   // Build tree structure
-  const tree = useMemo(() => buildDocumentTree(documents), [documents])
+  const tree = useMemo(() => {
+    return buildDocumentTree(documents)
+  }, [documents])
 
-  // Get all folder node IDs for collapse all functionality
+  // Get all folder node IDs for collapse all functionality (use id for consistency)
   const folderNodeIds = useMemo(() => {
     const ids: string[] = []
     const collectFolderIds = (nodes: TreeNode[]) => {
       nodes.forEach(node => {
         if (node.children.length > 0) {
-          ids.push(node.uuid || node.id)
+          ids.push(node.id)  // Use id instead of uuid
           collectFolderIds(node.children)
         }
       })
@@ -548,8 +560,7 @@ export function DocumentTree({
       {/* Document tree */}
       <div className="flex-1 overflow-auto">
         {tree.map((node) => {
-          const nodeId = node.uuid || node.id
-          const nodeIsCollapsed = bookId ? isCollapsed(bookId, nodeId) : false
+          const nodeIsCollapsed = bookId ? isCollapsed(bookId, node.id) : false
           return (
             <DocumentTreeNode
               key={node.id}
@@ -567,7 +578,7 @@ export function DocumentTree({
               isCollapsed={nodeIsCollapsed}
               onToggleCollapse={() => {
                 if (bookId) {
-                  toggleNode(bookId, nodeId)
+                  toggleNode(bookId, node.id)
                   saveCollapseState(bookId)
                 }
               }}
