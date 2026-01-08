@@ -15,6 +15,8 @@ interface DocumentListProps {
   loadingMore?: boolean
   // Book info for opening in Yuque
   bookInfo?: { userLogin: string; slug: string }
+  // Preview callback
+  onPreview?: (doc: Document) => void
 }
 
 const statusConfig = {
@@ -36,7 +38,8 @@ export function DocumentList({
   onLoadMore,
   hasMore = false,
   loadingMore = false,
-  bookInfo
+  bookInfo,
+  onPreview
 }: DocumentListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const isElectron = useIsElectron()
@@ -194,6 +197,12 @@ export function DocumentList({
               key={doc.id}
               className={`px-4 py-3 hover:bg-bg-secondary transition-colors duration-150 group ${isSelected ? 'bg-accent/5' : ''}`}
               onClick={selectable ? () => handleToggleSelect(doc.id) : undefined}
+              onDoubleClick={() => {
+                // 双击预览
+                if (isSynced && onPreview) {
+                  onPreview(doc)
+                }
+              }}
             >
               <div className="flex items-start gap-3">
                 {/* Checkbox */}
@@ -245,6 +254,20 @@ export function DocumentList({
                 
                 {/* Action buttons - show on hover */}
                 <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Preview button */}
+                  {isSynced && onPreview && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onPreview(doc) }}
+                      className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                      title="预览"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </button>
+                  )}
+                  
                   {/* Open file button */}
                   {isSynced && (
                     <button

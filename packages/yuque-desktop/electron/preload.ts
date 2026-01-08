@@ -46,6 +46,7 @@ const electronAPI: IPCInvokeAPI & IPCEventAPI = {
   'file:open': (filePath) => ipcRenderer.invoke('file:open', filePath),
   'file:openInYuque': (params) => ipcRenderer.invoke('file:openInYuque', params),
   'file:showInFolder': (filePath) => ipcRenderer.invoke('file:showInFolder', filePath),
+  'file:readContent': (filePath) => ipcRenderer.invoke('file:readContent', filePath),
 
   // Search
   'search:query': (query, options) => ipcRenderer.invoke('search:query', query, options),

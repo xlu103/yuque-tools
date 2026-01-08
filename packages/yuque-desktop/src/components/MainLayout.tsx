@@ -11,6 +11,7 @@ import { DocumentList } from './DocumentList'
 import { SettingsPanel } from './SettingsPanel'
 import { SyncHistoryPanel } from './SyncHistoryPanel'
 import { StatisticsPanel } from './StatisticsPanel'
+import { MarkdownPreview } from './MarkdownPreview'
 
 // Notes book ID constant
 const NOTES_BOOK_ID = '__notes__'
@@ -52,6 +53,9 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [showHistory, setShowHistory] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
+  
+  // Preview state
+  const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -395,6 +399,26 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     return <StatisticsPanel onClose={() => setShowStats(false)} />
   }
 
+  if (previewDoc) {
+    return (
+      <MarkdownPreview
+        filePath={previewDoc.filePath}
+        title={previewDoc.title}
+        onClose={() => setPreviewDoc(null)}
+        onOpenExternal={() => {
+          if (window.electronAPI) {
+            window.electronAPI['file:open'](previewDoc.filePath)
+          }
+        }}
+        onShowInFolder={() => {
+          if (window.electronAPI) {
+            window.electronAPI['file:showInFolder'](previewDoc.filePath)
+          }
+        }}
+      />
+    )
+  }
+
   if (showSettings) {
     return <SettingsPanel onClose={() => setShowSettings(false)} onLogout={onLogout} />
   }
@@ -636,6 +660,11 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             hasMore={selectedBookId === NOTES_BOOK_ID ? notesHasMore : false}
             loadingMore={notesLoading}
             bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
+            onPreview={(doc) => {
+              if (doc.localPath) {
+                setPreviewDoc({ filePath: doc.localPath, title: doc.title })
+              }
+            }}
           />
         </div>
       </div>

@@ -148,3 +148,33 @@ export async function openInYuque(
     }
   }
 }
+
+/**
+ * Read file content
+ * 
+ * @param filePath - Path to the file to read
+ * @returns Promise resolving to file content or error
+ */
+export async function readFileContent(
+  filePath: string
+): Promise<{ success: boolean; content?: string; error?: string }> {
+  try {
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return {
+        success: false,
+        error: `文件不存在: ${filePath}`
+      }
+    }
+
+    // Read file content
+    const content = fs.readFileSync(filePath, 'utf-8')
+    return { success: true, content }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    return {
+      success: false,
+      error: `读取文件失败: ${errorMsg}`
+    }
+  }
+}

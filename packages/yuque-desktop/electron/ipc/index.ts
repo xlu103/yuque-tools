@@ -57,7 +57,8 @@ import {
 import {
   openFile,
   openInYuque,
-  showInFolder
+  showInFolder,
+  readFileContent
 } from '../services/fileManager'
 import { searchService } from '../services/search'
 import { getStatistics } from '../services/statistics'
@@ -469,6 +470,11 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
   ipcMain.handle('file:showInFolder', async (_event, filePath: string): Promise<FileOperationResult> => {
     console.log('file:showInFolder called for:', filePath)
     return await showInFolder(filePath)
+  })
+
+  ipcMain.handle('file:readContent', async (_event, filePath: string): Promise<{ success: boolean; content?: string; error?: string }> => {
+    console.log('file:readContent called for:', filePath)
+    return await readFileContent(filePath)
   })
 
   // ============================================
