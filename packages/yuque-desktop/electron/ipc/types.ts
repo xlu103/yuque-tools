@@ -199,6 +199,7 @@ export interface IPCChannels {
   'file:openInYuque': (params: OpenInYuqueParams) => Promise<FileOperationResult>
   'file:showInFolder': (filePath: string) => Promise<FileOperationResult>
   'file:readContent': (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>
+  'file:readImage': (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>
 
   // Search
   'search:query': (query: string, options?: SearchOptions) => Promise<SearchResult[]>

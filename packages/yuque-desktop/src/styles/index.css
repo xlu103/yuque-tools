@@ -392,3 +392,98 @@
 .animate-spin {
   animation: spin 1s linear infinite;
 }
+
+
+/* ============================================
+   Markdown Admonition Styles (语雀高亮块)
+   ============================================ */
+
+.admonition {
+  @apply flex items-start gap-3 p-4 my-4 rounded-lg;
+  border-left: 4px solid;
+}
+
+.admonition-icon {
+  @apply text-lg flex-shrink-0;
+}
+
+.admonition-content {
+  @apply flex-1 text-sm leading-relaxed;
+}
+
+/* Info */
+.admonition-info {
+  background-color: rgba(0, 122, 255, 0.1);
+  border-left-color: var(--color-info);
+}
+
+/* Warning */
+.admonition-warning {
+  background-color: rgba(255, 149, 0, 0.1);
+  border-left-color: var(--color-warning);
+}
+
+/* Danger */
+.admonition-danger {
+  background-color: rgba(255, 59, 48, 0.1);
+  border-left-color: var(--color-error);
+}
+
+/* Success */
+.admonition-success {
+  background-color: rgba(52, 199, 89, 0.1);
+  border-left-color: var(--color-success);
+}
+
+/* Tip */
+.admonition-tip {
+  background-color: rgba(255, 204, 0, 0.1);
+  border-left-color: rgb(255, 204, 0);
+}
+
+/* Note */
+.admonition-note {
+  background-color: rgba(142, 142, 147, 0.1);
+  border-left-color: var(--color-text-secondary);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .admonition-info {
+    background-color: rgba(10, 132, 255, 0.15);
+  }
+  :root:not([data-theme="light"]) .admonition-warning {
+    background-color: rgba(255, 159, 10, 0.15);
+  }
+  :root:not([data-theme="light"]) .admonition-danger {
+    background-color: rgba(255, 69, 58, 0.15);
+  }
+  :root:not([data-theme="light"]) .admonition-success {
+    background-color: rgba(48, 209, 88, 0.15);
+  }
+  :root:not([data-theme="light"]) .admonition-tip {
+    background-color: rgba(255, 214, 10, 0.15);
+  }
+  :root:not([data-theme="light"]) .admonition-note {
+    background-color: rgba(142, 142, 147, 0.15);
+  }
+}
+
+:root[data-theme="dark"] .admonition-info {
+  background-color: rgba(10, 132, 255, 0.15);
+}
+:root[data-theme="dark"] .admonition-warning {
+  background-color: rgba(255, 159, 10, 0.15);
+}
+:root[data-theme="dark"] .admonition-danger {
+  background-color: rgba(255, 69, 58, 0.15);
+}
+:root[data-theme="dark"] .admonition-success {
+  background-color: rgba(48, 209, 88, 0.15);
+}
+:root[data-theme="dark"] .admonition-tip {
+  background-color: rgba(255, 214, 10, 0.15);
+}
+:root[data-theme="dark"] .admonition-note {
+  background-color: rgba(142, 142, 147, 0.15);
+}

@@ -497,6 +497,43 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
     return await readFileContent(filePath)
   })
 
+  // 读取图片文件并返回 base64 数据
+  ipcMain.handle('file:readImage', async (_event, filePath: string): Promise<{ success: boolean; dataUrl?: string; error?: string }> => {
+    console.log('file:readImage called for:', filePath)
+    try {
+      const fs = await import('fs')
+      const path = await import('path')
+      
+      if (!fs.existsSync(filePath)) {
+        return { success: false, error: '文件不存在' }
+      }
+      
+      const buffer = fs.readFileSync(filePath)
+      const ext = path.extname(filePath).toLowerCase()
+      
+      // 根据扩展名确定 MIME 类型
+      const mimeTypes: Record<string, string> = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.bmp': 'image/bmp',
+        '.ico': 'image/x-icon'
+      }
+      
+      const mimeType = mimeTypes[ext] || 'image/png'
+      const base64 = buffer.toString('base64')
+      const dataUrl = `data:${mimeType};base64,${base64}`
+      
+      return { success: true, dataUrl }
+    } catch (error) {
+      console.error('Failed to read image:', error)
+      return { success: false, error: String(error) }
+    }
+  })
+
   // ============================================
   // Search Handlers
   // ============================================
