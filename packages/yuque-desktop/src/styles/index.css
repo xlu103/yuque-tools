@@ -197,12 +197,11 @@
   
   /* Sidebar */
   .mac-sidebar {
-    width: var(--spacing-sidebar);
     background-color: var(--color-bg-sidebar);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-right: 1px solid var(--color-border-light);
-    @apply h-full flex-shrink-0 flex flex-col;
+    @apply h-full w-full flex-shrink-0 flex flex-col;
   }
   
   /* Main Content */

@@ -181,6 +181,8 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       const docsToStore: DocumentInput[] = docs.map((doc) => {
         const existing = existingDocsMap.get(doc.id)
         let syncStatus: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed' = 'new'
+        let localPath: string | undefined = undefined
+        let localSyncedAt: string | undefined = undefined
         
         if (existing) {
           // Preserve failed status for regular books, but reset for notes
@@ -194,6 +196,9 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
             }
           } else if (existing.sync_status === 'synced') {
             syncStatus = 'synced'
+            // Preserve local path and sync time for synced documents
+            localPath = existing.local_path || undefined
+            localSyncedAt = existing.local_synced_at || undefined
           }
         }
         
@@ -209,6 +214,8 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
           depth: doc.depth,
           sortOrder: doc.sortOrder,
           remoteUpdatedAt: doc.remoteUpdatedAt,
+          localPath: localPath,
+          localSyncedAt: localSyncedAt,
           syncStatus: syncStatus
         }
       })
@@ -242,7 +249,25 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       upsertDocuments(docsToStore)
       console.log(`Fetched and stored ${docs.length} documents for book ${bookId}`)
       
-      return docs
+      // Return documents with correct sync status and local path
+      const result: Document[] = docsToStore.map(doc => ({
+        id: doc.id,
+        bookId: doc.bookId,
+        slug: doc.slug,
+        title: doc.title,
+        uuid: doc.uuid || undefined,
+        parentUuid: doc.parentUuid || undefined,
+        childUuid: doc.childUuid || undefined,
+        docType: doc.docType,
+        depth: doc.depth,
+        sortOrder: doc.sortOrder,
+        remoteUpdatedAt: doc.remoteUpdatedAt || '',
+        localPath: doc.localPath,
+        localSyncedAt: doc.localSyncedAt,
+        syncStatus: doc.syncStatus || 'new'
+      }))
+      
+      return result
     } catch (error) {
       console.error('Failed to fetch docs:', error)
       throw error

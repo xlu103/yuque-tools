@@ -1,6 +1,7 @@
-import { useCallback, useState, useMemo } from 'react'
+import { useCallback, useMemo, useEffect } from 'react'
 import type { Document } from '../hooks'
 import { useIsElectron } from '../hooks'
+import { useTreeCollapseStore } from '../stores'
 
 interface DocumentTreeProps {
   documents: Document[]
@@ -10,6 +11,7 @@ interface DocumentTreeProps {
   onSelectionChange?: (ids: Set<string>) => void
   selectable?: boolean
   bookInfo?: { userLogin: string; slug: string }
+  bookId?: string  // 新增：用于折叠状态持久化
   onPreview?: (doc: Document) => void
 }
 
@@ -90,7 +92,10 @@ function DocumentTreeNode({
   onOpenFile,
   onOpenInYuque,
   onShowInFolder,
-  bookInfo
+  bookInfo,
+  bookId,
+  isCollapsed,
+  onToggleCollapse
 }: {
   node: TreeNode
   isSelected: boolean
@@ -102,12 +107,15 @@ function DocumentTreeNode({
   onOpenInYuque: (doc: Document) => void
   onShowInFolder: (doc: Document) => void
   bookInfo?: { userLogin: string; slug: string }
+  bookId?: string
+  isCollapsed: boolean
+  onToggleCollapse: () => void
 }) {
-  const [isExpanded, setIsExpanded] = useState(true)
   const hasChildren = node.children.length > 0
   const isSynced = node.syncStatus === 'synced' && node.localPath
   const status = statusConfig[node.syncStatus]
   const isFolder = node.docType === 'TITLE'
+  const { isCollapsed: checkCollapsed, toggleNode, saveCollapseState } = useTreeCollapseStore()
 
   return (
     <div>
@@ -125,16 +133,16 @@ function DocumentTreeNode({
         }}
       >
         {/* Expand/collapse button */}
-        {hasChildren && (
+        {hasChildren ? (
           <button
             onClick={(e) => {
               e.stopPropagation()
-              setIsExpanded(!isExpanded)
+              onToggleCollapse()
             }}
             className="flex-shrink-0 w-4 h-4 flex items-center justify-center text-text-tertiary hover:text-text-primary mt-0.5"
           >
             <svg
-              className={`w-3 h-3 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+              className={`w-3 h-3 transition-transform ${!isCollapsed ? 'rotate-90' : ''}`}
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -142,6 +150,8 @@ function DocumentTreeNode({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </button>
+        ) : (
+          <div className="flex-shrink-0 w-4 h-4" />
         )}
 
         {/* Checkbox */}
@@ -289,23 +299,35 @@ function DocumentTreeNode({
       </div>
 
       {/* Render children */}
-      {hasChildren && isExpanded && (
+      {hasChildren && !isCollapsed && (
         <div>
-          {node.children.map((child) => (
-            <DocumentTreeNode
-              key={child.id}
-              node={child}
-              isSelected={selectedIds.has(child.id)}
-              selectable={selectable}
-              selectedIds={selectedIds}
-              onToggleSelect={onToggleSelect}
-              onPreview={onPreview}
-              onOpenFile={onOpenFile}
-              onOpenInYuque={onOpenInYuque}
-              onShowInFolder={onShowInFolder}
-              bookInfo={bookInfo}
-            />
-          ))}
+          {node.children.map((child) => {
+            const childNodeId = child.uuid || child.id
+            const childIsCollapsed = bookId ? checkCollapsed(bookId, childNodeId) : false
+            return (
+              <DocumentTreeNode
+                key={child.id}
+                node={child}
+                isSelected={selectedIds.has(child.id)}
+                selectable={selectable}
+                selectedIds={selectedIds}
+                onToggleSelect={onToggleSelect}
+                onPreview={onPreview}
+                onOpenFile={onOpenFile}
+                onOpenInYuque={onOpenInYuque}
+                onShowInFolder={onShowInFolder}
+                bookInfo={bookInfo}
+                bookId={bookId}
+                isCollapsed={childIsCollapsed}
+                onToggleCollapse={() => {
+                  if (bookId) {
+                    toggleNode(bookId, childNodeId)
+                    saveCollapseState(bookId)
+                  }
+                }}
+              />
+            )
+          })}
         </div>
       )}
     </div>
@@ -320,12 +342,59 @@ export function DocumentTree({
   onSelectionChange,
   selectable = false,
   bookInfo,
+  bookId,
   onPreview
 }: DocumentTreeProps) {
   const isElectron = useIsElectron()
+  const { 
+    isCollapsed, 
+    toggleNode, 
+    collapseAll, 
+    expandAll, 
+    loadCollapseState, 
+    saveCollapseState 
+  } = useTreeCollapseStore()
 
   // Build tree structure
   const tree = useMemo(() => buildDocumentTree(documents), [documents])
+
+  // Get all folder node IDs for collapse all functionality
+  const folderNodeIds = useMemo(() => {
+    const ids: string[] = []
+    const collectFolderIds = (nodes: TreeNode[]) => {
+      nodes.forEach(node => {
+        if (node.children.length > 0) {
+          ids.push(node.uuid || node.id)
+          collectFolderIds(node.children)
+        }
+      })
+    }
+    collectFolderIds(tree)
+    return ids
+  }, [tree])
+
+  // Load collapse state when bookId changes
+  useEffect(() => {
+    if (bookId) {
+      loadCollapseState(bookId)
+    }
+  }, [bookId, loadCollapseState])
+
+  // Handle collapse all
+  const handleCollapseAll = useCallback(() => {
+    if (bookId) {
+      collapseAll(bookId, folderNodeIds)
+      saveCollapseState(bookId)
+    }
+  }, [bookId, folderNodeIds, collapseAll, saveCollapseState])
+
+  // Handle expand all
+  const handleExpandAll = useCallback(() => {
+    if (bookId) {
+      expandAll(bookId)
+      saveCollapseState(bookId)
+    }
+  }, [bookId, expandAll, saveCollapseState])
 
   // File operations
   const handleOpenFile = useCallback(
@@ -432,6 +501,32 @@ export function DocumentTree({
 
   return (
     <div className="flex flex-col h-full">
+      {/* Collapse/Expand toolbar */}
+      {folderNodeIds.length > 0 && (
+        <div className="px-4 py-2 border-b border-border-light bg-bg-secondary flex items-center gap-2">
+          <button
+            onClick={handleCollapseAll}
+            className="px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors flex items-center gap-1"
+            title="全部折叠"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+            </svg>
+            <span>全部折叠</span>
+          </button>
+          <button
+            onClick={handleExpandAll}
+            className="px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors flex items-center gap-1"
+            title="全部展开"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <span>全部展开</span>
+          </button>
+        </div>
+      )}
+
       {/* Select all header */}
       {selectable && documents.length > 0 && (
         <div className="px-4 py-2 border-b border-border-light bg-bg-secondary flex items-center gap-3">
@@ -452,21 +547,33 @@ export function DocumentTree({
 
       {/* Document tree */}
       <div className="flex-1 overflow-auto">
-        {tree.map((node) => (
-          <DocumentTreeNode
-            key={node.id}
-            node={node}
-            isSelected={selectedIds.has(node.id)}
-            selectable={selectable}
-            selectedIds={selectedIds}
-            onToggleSelect={handleToggleSelect}
-            onPreview={onPreview}
-            onOpenFile={handleOpenFile}
-            onOpenInYuque={handleOpenInYuque}
-            onShowInFolder={handleShowInFolder}
-            bookInfo={bookInfo}
-          />
-        ))}
+        {tree.map((node) => {
+          const nodeId = node.uuid || node.id
+          const nodeIsCollapsed = bookId ? isCollapsed(bookId, nodeId) : false
+          return (
+            <DocumentTreeNode
+              key={node.id}
+              node={node}
+              isSelected={selectedIds.has(node.id)}
+              selectable={selectable}
+              selectedIds={selectedIds}
+              onToggleSelect={handleToggleSelect}
+              onPreview={onPreview}
+              onOpenFile={handleOpenFile}
+              onOpenInYuque={handleOpenInYuque}
+              onShowInFolder={handleShowInFolder}
+              bookInfo={bookInfo}
+              bookId={bookId}
+              isCollapsed={nodeIsCollapsed}
+              onToggleCollapse={() => {
+                if (bookId) {
+                  toggleNode(bookId, nodeId)
+                  saveCollapseState(bookId)
+                }
+              }}
+            />
+          )
+        })}
       </div>
     </div>
   )
