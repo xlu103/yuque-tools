@@ -62,7 +62,8 @@ export function getAppSettings(): AppSettings {
     linebreak: settings.linebreak === 'true',
     latexcode: settings.latexcode === 'true',
     theme: (settings.theme as AppSettings['theme']) ?? 'system',
-    autoSyncInterval: settings.autoSyncInterval ? parseInt(settings.autoSyncInterval, 10) as AppSettings['autoSyncInterval'] : 0
+    autoSyncInterval: settings.autoSyncInterval ? parseInt(settings.autoSyncInterval, 10) as AppSettings['autoSyncInterval'] : 0,
+    autoSyncOnOpen: settings.autoSyncOnOpen === 'true'
   }
 }
 

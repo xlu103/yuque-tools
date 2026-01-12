@@ -22,6 +22,7 @@ const electronAPI: IPCInvokeAPI & IPCEventAPI = {
   // Knowledge Bases
   'books:list': () => ipcRenderer.invoke('books:list'),
   'books:getDocs': (bookId) => ipcRenderer.invoke('books:getDocs', bookId),
+  'books:getLocalDocs': (bookId) => ipcRenderer.invoke('books:getLocalDocs', bookId),
 
   // Notes (小记)
   'notes:loadMore': (offset, limit) => ipcRenderer.invoke('notes:loadMore', offset, limit),

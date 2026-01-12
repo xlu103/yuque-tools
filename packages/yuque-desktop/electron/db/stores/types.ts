@@ -123,6 +123,7 @@ export interface AppSettings {
   latexcode: boolean
   theme: 'system' | 'light' | 'dark'
   autoSyncInterval: 0 | 30 | 60 | 720 | 1440 // 0 = disabled, others in minutes
+  autoSyncOnOpen: boolean // Auto sync when opening a knowledge base
 }
 
 

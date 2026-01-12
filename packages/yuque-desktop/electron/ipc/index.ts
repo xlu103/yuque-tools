@@ -140,6 +140,30 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
     }
   })
 
+  // Get local cached documents (no network request)
+  ipcMain.handle('books:getLocalDocs', async (_event, bookId: string): Promise<Document[]> => {
+    console.log('books:getLocalDocs called for:', bookId)
+    const cachedDocs = getDocumentsByBookId(bookId)
+    console.log(`[books:getLocalDocs] Found ${cachedDocs.length} cached documents`)
+    
+    return cachedDocs.map((doc) => ({
+      id: doc.id,
+      bookId: doc.book_id,
+      slug: doc.slug,
+      title: doc.title,
+      uuid: doc.uuid || undefined,
+      parentUuid: doc.parent_uuid || undefined,
+      childUuid: doc.child_uuid || undefined,
+      docType: doc.doc_type || 'DOC',
+      depth: doc.depth || 0,
+      sortOrder: doc.sort_order || 0,
+      localPath: doc.local_path || undefined,
+      remoteUpdatedAt: doc.remote_updated_at || '',
+      localSyncedAt: doc.local_synced_at || undefined,
+      syncStatus: doc.sync_status
+    }))
+  })
+
   ipcMain.handle('books:getDocs', async (_event, bookId: string): Promise<Document[]> => {
     console.log('books:getDocs called for:', bookId)
     try {

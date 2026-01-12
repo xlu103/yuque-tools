@@ -86,6 +86,7 @@ export interface AppSettings {
   latexcode: boolean
   theme: 'system' | 'light' | 'dark'
   autoSyncInterval: 0 | 30 | 60 | 720 | 1440 // 0 = disabled, others in minutes
+  autoSyncOnOpen: boolean // Auto sync when opening a knowledge base
 }
 
 export interface SyncHistoryItem {
@@ -174,6 +175,7 @@ export interface IPCChannels {
   // Knowledge Bases
   'books:list': () => Promise<KnowledgeBase[]>
   'books:getDocs': (bookId: string) => Promise<Document[]>
+  'books:getLocalDocs': (bookId: string) => Promise<Document[]>
 
   // Notes (小记)
   'notes:loadMore': (offset: number, limit?: number) => Promise<{ notes: Document[]; hasMore: boolean }>

@@ -27,7 +27,8 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
     linebreak: true,
     latexcode: false,
     theme: 'system',
-    autoSyncInterval: 0
+    autoSyncInterval: 0,
+    autoSyncOnOpen: false
   })
   const [loading, setLoading] = useState(true)
   const [isForceSyncing, setIsForceSyncing] = useState(false)
@@ -179,7 +180,7 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                 </div>
               </div>
               <div>
-                <label className="block text-sm text-text-secondary mb-2">自动同步</label>
+                <label className="block text-sm text-text-secondary mb-2">定时自动同步</label>
                 <select
                   value={settings.autoSyncInterval}
                   onChange={(e) => handleSettingChange('autoSyncInterval', parseInt(e.target.value, 10))}
@@ -195,6 +196,12 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                   开启后将按设定间隔自动同步所有知识库
                 </p>
               </div>
+              <MacSwitch
+                label="打开知识库时自动同步"
+                description="选择知识库后自动开始同步文档"
+                checked={settings.autoSyncOnOpen}
+                onChange={(checked) => handleSettingChange('autoSyncOnOpen', checked)}
+              />
               <div>
                 <label className="block text-sm text-text-secondary mb-2">全局强制同步</label>
                 <MacButton 

@@ -116,6 +116,14 @@ export function useBooks() {
     [isElectron]
   )
 
+  const getLocalDocs = useCallback(
+    async (bookId: string): Promise<Document[]> => {
+      if (!isElectron) throw new Error('Not in Electron environment')
+      return window.electronAPI['books:getLocalDocs'](bookId)
+    },
+    [isElectron]
+  )
+
   const loadMoreNotes = useCallback(
     async (offset: number, limit?: number): Promise<{ notes: Document[]; hasMore: boolean }> => {
       if (!isElectron) throw new Error('Not in Electron environment')
@@ -129,7 +137,7 @@ export function useBooks() {
     return window.electronAPI['notes:getAllForSync']()
   }, [isElectron])
 
-  return { listBooks, getBookDocs, loadMoreNotes, getAllNotesForSync, isElectron }
+  return { listBooks, getBookDocs, getLocalDocs, loadMoreNotes, getAllNotesForSync, isElectron }
 }
 
 /**

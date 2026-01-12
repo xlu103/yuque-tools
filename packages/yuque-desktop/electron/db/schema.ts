@@ -222,5 +222,6 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   linebreak: 'true',
   latexcode: 'false',
   theme: 'system',
-  autoSyncInterval: '0'
+  autoSyncInterval: '0',
+  autoSyncOnOpen: 'false'
 }

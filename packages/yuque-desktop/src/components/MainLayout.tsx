@@ -31,7 +31,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const isElectron = useIsElectron()
-  const { listBooks, getBookDocs, loadMoreNotes, getAllNotesForSync } = useBooks()
+  const { listBooks, getBookDocs, getLocalDocs, loadMoreNotes, getAllNotesForSync } = useBooks()
   const { startSync, cancelSync } = useSync()
   const { getSettings } = useSettings()
   const { showToast } = useToast()
@@ -88,6 +88,12 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [notesHasMore, setNotesHasMore] = useState(true)
   const [notesLoading, setNotesLoading] = useState(false)
   
+  // Network loading state (for background fetch indicator)
+  const [isFetchingRemote, setIsFetchingRemote] = useState(false)
+  
+  // Settings cache
+  const [autoSyncOnOpen, setAutoSyncOnOpen] = useState(false)
+  
   // Auto sync timer ref
   const autoSyncTimerRef = useRef<NodeJS.Timeout | null>(null)
   const autoSyncIntervalRef = useRef<number>(0)
@@ -113,10 +119,15 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     }
   }, [isElectron, isRunning, selectedBookId])
 
-  // Load books on mount
+  // Load books and settings on mount
   useEffect(() => {
     loadBooks()
     loadLayout() // Load saved panel layout
+    
+    // Load autoSyncOnOpen setting
+    getSettings().then(settings => {
+      setAutoSyncOnOpen(settings.autoSyncOnOpen || false)
+    }).catch(console.error)
   }, [])
 
   // Auto sync setup
@@ -235,27 +246,60 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   }, [selectedBookId])
 
   const loadDocuments = useCallback(async (bookId: string) => {
-    setLoadingDocs(true)
+    // Step 1: First load local cached documents (instant)
+    try {
+      const localDocs = await getLocalDocs(bookId)
+      if (localDocs.length > 0) {
+        setDocuments(bookId, localDocs)
+        console.log(`[loadDocuments] Loaded ${localDocs.length} local cached documents`)
+      }
+    } catch (error) {
+      console.error('Failed to load local docs:', error)
+    }
+    
+    // Step 2: Fetch from network in background
+    setIsFetchingRemote(true)
     try {
       const docs = await getBookDocs(bookId)
       setDocuments(bookId, docs)
+      console.log(`[loadDocuments] Fetched ${docs.length} documents from network`)
       
       // Reset notes lazy loading state when switching to notes book
       if (bookId === NOTES_BOOK_ID) {
         setNotesHasMore(true)
+      }
+      
+      // Auto sync if enabled
+      if (autoSyncOnOpen && !isRunning && bookId !== NOTES_BOOK_ID) {
+        const settings = await getSettings()
+        if (settings.syncDirectory) {
+          console.log('[loadDocuments] Auto sync on open enabled, starting sync...')
+          try {
+            await startSync({ bookIds: [bookId], force: false })
+            setRunning(true)
+          } catch (syncError) {
+            console.error('Auto sync failed:', syncError)
+          }
+        }
       }
     } catch (error: any) {
       if (isSessionExpiredError(error)) {
         showToast('error', '登录已过期，请重新登录')
         onLogout()
       } else {
-        showToast('error', '获取文档列表失败')
+        // Only show error if we don't have local data
+        const currentDocs = getDocumentsForBook(bookId)
+        if (currentDocs.length === 0) {
+          showToast('error', '获取文档列表失败')
+        } else {
+          showToast('warning', '网络获取失败，显示本地缓存')
+        }
       }
       console.error('Failed to load documents:', error)
     } finally {
-      setLoadingDocs(false)
+      setIsFetchingRemote(false)
     }
-  }, [getBookDocs, setDocuments, setLoadingDocs, showToast, onLogout])
+  }, [getLocalDocs, getBookDocs, setDocuments, showToast, onLogout, autoSyncOnOpen, isRunning, getSettings, startSync, setRunning, getDocumentsForBook])
 
   // Load more notes (lazy loading)
   const handleLoadMoreNotes = useCallback(async () => {
@@ -659,6 +703,14 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
           </ToolbarGroup>
 
           <div className="flex-1" />
+
+          {/* Network loading indicator */}
+          {isFetchingRemote && (
+            <div className="flex items-center gap-2 text-text-secondary mr-2">
+              <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs">获取中...</span>
+            </div>
+          )}
 
           {/* Sync controls */}
           <ToolbarGroup>
