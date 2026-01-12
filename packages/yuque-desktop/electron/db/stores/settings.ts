@@ -104,6 +104,9 @@ export function saveAppSettings(settings: Partial<AppSettings>): void {
   if (settings.autoSyncInterval !== undefined) {
     entries.push(['autoSyncInterval', String(settings.autoSyncInterval)])
   }
+  if (settings.autoSyncOnOpen !== undefined) {
+    entries.push(['autoSyncOnOpen', String(settings.autoSyncOnOpen)])
+  }
 
   if (entries.length > 0) {
     saveMany(entries)

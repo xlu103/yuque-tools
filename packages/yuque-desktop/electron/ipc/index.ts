@@ -292,6 +292,13 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
         syncStatus: doc.syncStatus || 'new'
       }))
       
+      // Log returned documents status for debugging
+      const returnedStatusSummary = result.reduce((acc, doc) => {
+        acc[doc.syncStatus!] = (acc[doc.syncStatus!] || 0) + 1
+        return acc
+      }, {} as Record<string, number>)
+      console.log(`[books:getDocs] Returned documents status:`, returnedStatusSummary)
+      
       return result
     } catch (error) {
       console.error('Failed to fetch docs:', error)
@@ -502,8 +509,9 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
   // ============================================
 
   ipcMain.handle('settings:get', async (): Promise<AppSettings> => {
-    console.log('settings:get called')
-    return getAppSettings()
+    const settings = getAppSettings()
+    console.log('settings:get called, autoSyncOnOpen:', settings.autoSyncOnOpen, 'syncDirectory:', settings.syncDirectory ? 'SET' : 'NOT SET')
+    return settings
   })
 
   ipcMain.handle('settings:set', async (_event, settings: Partial<AppSettings>) => {

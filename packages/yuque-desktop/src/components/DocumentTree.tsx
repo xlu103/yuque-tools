@@ -303,10 +303,12 @@ function DocumentTreeNode({
           </div>
         )}
 
-        {/* Status badge */}
-        <div className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium ${status.color} ${status.bg}`}>
-          {status.label}
-        </div>
+        {/* Status badge - only show for documents, not folders */}
+        {!isFolder && (
+          <div className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium ${status.color} ${status.bg}`}>
+            {status.label}
+          </div>
+        )}
       </div>
 
       {/* Render children */}

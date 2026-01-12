@@ -273,21 +273,26 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
         setNotesHasMore(true)
       }
       
-      // Auto sync if enabled - read directly from settings to ensure latest value
+      // Auto sync files to local if enabled - read directly from settings to ensure latest value
       const settings = await getSettings()
-      if (settings.autoSyncOnOpen && !isRunning && bookId !== NOTES_BOOK_ID) {
-        if (settings.syncDirectory) {
-          console.log('[loadDocuments] Auto sync on open enabled, starting sync...')
-          showToast('info', '正在自动同步...')
+      
+      if (settings.autoSyncOnOpen && bookId !== NOTES_BOOK_ID && settings.syncDirectory) {
+        // Check if there are documents that need syncing (new or modified)
+        // Filter out TITLE (folder) type documents
+        const docsNeedSync = docs.filter(d => 
+          (d.syncStatus === 'new' || d.syncStatus === 'modified') && d.docType !== 'TITLE'
+        )
+        
+        if (docsNeedSync.length > 0) {
+          showToast('info', `正在自动同步 ${docsNeedSync.length} 个文档...`)
           try {
             setRunning(true)
             await startSync({ bookIds: [bookId], force: false })
           } catch (syncError) {
             console.error('Auto sync failed:', syncError)
+            showToast('error', '自动同步失败')
             setRunning(false)
           }
-        } else {
-          console.log('[loadDocuments] Auto sync skipped: no sync directory set')
         }
       }
     } catch (error: any) {
