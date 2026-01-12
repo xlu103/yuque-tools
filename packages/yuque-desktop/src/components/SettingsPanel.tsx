@@ -32,6 +32,7 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
   })
   const [loading, setLoading] = useState(true)
   const [isForceSyncing, setIsForceSyncing] = useState(false)
+  const [isResetting, setIsResetting] = useState(false)
   const [showFailedDocs, setShowFailedDocs] = useState(false)
 
   // Load settings
@@ -134,6 +135,30 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
     }
   }, [isRunning, isForceSyncing, settings.syncDirectory, books, listBooks, setBooks, startSync, setRunning, setProgress, showToast, getAllNotesForSync])
 
+  // Handle reset sync data
+  const handleResetSyncData = useCallback(async () => {
+    if (isRunning || isResetting) {
+      showToast('warning', '请等待当前操作完成')
+      return
+    }
+
+    if (!confirm('确定要重置所有同步数据吗？\n\n这将清除所有文档的同步状态和本地路径记录，但不会删除已下载的文件。\n\n重置后需要重新同步所有文档。')) {
+      return
+    }
+
+    setIsResetting(true)
+
+    try {
+      const result = await window.electronAPI['sync:resetAllData']()
+      showToast('success', `已重置 ${result.documentsReset} 个文档的同步数据`)
+    } catch (error) {
+      console.error('Reset sync data failed:', error)
+      showToast('error', '重置失败，请重试')
+    } finally {
+      setIsResetting(false)
+    }
+  }, [isRunning, isResetting, showToast])
+
   if (loading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-bg-primary">
@@ -232,6 +257,26 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                 </MacButton>
                 <p className="mt-1 text-xs text-text-tertiary">
                   管理同步失败的文档，可重试或忽略
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">重置同步数据</label>
+                <MacButton 
+                  variant="danger" 
+                  onClick={handleResetSyncData}
+                  disabled={isResetting || isRunning}
+                >
+                  {isResetting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      重置中...
+                    </>
+                  ) : (
+                    '重置同步数据'
+                  )}
+                </MacButton>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  清除所有文档的同步状态和本地路径记录，适用于同步目录被更改或文件被删除的情况。不会删除已下载的文件。
                 </p>
               </div>
             </div>

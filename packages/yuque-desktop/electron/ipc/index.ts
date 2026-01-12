@@ -33,6 +33,7 @@ import {
   // Sync History
   getRecentSyncHistory
 } from '../db/stores'
+import { getDatabase } from '../db'
 import type { BookInput, DocumentInput } from '../db/stores/types'
 import {
   login as authLogin,
@@ -466,6 +467,34 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
     console.log('sync:clearFailedDoc called for:', docId)
     // Mark as deleted to skip in future syncs
     updateDocumentSyncStatus(docId, 'deleted')
+  })
+
+  ipcMain.handle('sync:resetAllData', async (): Promise<{ documentsReset: number }> => {
+    console.log('sync:resetAllData called')
+    const db = getDatabase()
+    
+    // Reset all documents: clear local_path, local_synced_at, and set sync_status to 'new'
+    const result = db.prepare(`
+      UPDATE documents 
+      SET local_path = NULL, 
+          local_synced_at = NULL, 
+          sync_status = 'new',
+          updated_at = datetime('now')
+      WHERE sync_status != 'deleted'
+    `).run()
+    
+    console.log(`[sync:resetAllData] Reset ${result.changes} documents`)
+    
+    // Clear sync history
+    db.prepare('DELETE FROM sync_history').run()
+    
+    // Clear sync sessions
+    db.prepare('DELETE FROM sync_sessions').run()
+    
+    // Clear resources
+    db.prepare('DELETE FROM resources').run()
+    
+    return { documentsReset: result.changes }
   })
 
   // ============================================

@@ -177,10 +177,14 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   // Reload auto sync settings when returning from settings panel
   useEffect(() => {
     if (!showSettings) {
-      // Settings panel closed, check if auto sync interval changed
+      // Settings panel closed, check if settings changed
       const checkAutoSyncSettings = async () => {
         try {
           const settings = await getSettings()
+          
+          // Update autoSyncOnOpen setting
+          setAutoSyncOnOpen(settings.autoSyncOnOpen || false)
+          
           const newInterval = settings.autoSyncInterval || 0
           
           if (newInterval !== autoSyncIntervalRef.current) {
@@ -269,17 +273,21 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
         setNotesHasMore(true)
       }
       
-      // Auto sync if enabled
-      if (autoSyncOnOpen && !isRunning && bookId !== NOTES_BOOK_ID) {
-        const settings = await getSettings()
+      // Auto sync if enabled - read directly from settings to ensure latest value
+      const settings = await getSettings()
+      if (settings.autoSyncOnOpen && !isRunning && bookId !== NOTES_BOOK_ID) {
         if (settings.syncDirectory) {
           console.log('[loadDocuments] Auto sync on open enabled, starting sync...')
+          showToast('info', '正在自动同步...')
           try {
-            await startSync({ bookIds: [bookId], force: false })
             setRunning(true)
+            await startSync({ bookIds: [bookId], force: false })
           } catch (syncError) {
             console.error('Auto sync failed:', syncError)
+            setRunning(false)
           }
+        } else {
+          console.log('[loadDocuments] Auto sync skipped: no sync directory set')
         }
       }
     } catch (error: any) {
@@ -299,7 +307,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     } finally {
       setIsFetchingRemote(false)
     }
-  }, [getLocalDocs, getBookDocs, setDocuments, showToast, onLogout, autoSyncOnOpen, isRunning, getSettings, startSync, setRunning, getDocumentsForBook])
+  }, [getLocalDocs, getBookDocs, setDocuments, showToast, onLogout, isRunning, getSettings, startSync, setRunning, getDocumentsForBook])
 
   // Load more notes (lazy loading)
   const handleLoadMoreNotes = useCallback(async () => {

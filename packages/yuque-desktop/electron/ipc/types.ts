@@ -190,6 +190,7 @@ export interface IPCChannels {
   'sync:getFailedDocs': () => Promise<FailedDocument[]>
   'sync:retryFailedDoc': (docId: string) => Promise<void>
   'sync:clearFailedDoc': (docId: string) => Promise<void>
+  'sync:resetAllData': () => Promise<{ documentsReset: number }>
 
   // Settings
   'settings:get': () => Promise<AppSettings>

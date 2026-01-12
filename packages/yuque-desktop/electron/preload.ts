@@ -37,6 +37,7 @@ const electronAPI: IPCInvokeAPI & IPCEventAPI = {
   'sync:getFailedDocs': () => ipcRenderer.invoke('sync:getFailedDocs'),
   'sync:retryFailedDoc': (docId) => ipcRenderer.invoke('sync:retryFailedDoc', docId),
   'sync:clearFailedDoc': (docId) => ipcRenderer.invoke('sync:clearFailedDoc', docId),
+  'sync:resetAllData': () => ipcRenderer.invoke('sync:resetAllData'),
 
   // Settings
   'settings:get': () => ipcRenderer.invoke('settings:get'),
