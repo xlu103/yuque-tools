@@ -17,6 +17,12 @@ import { MarkdownPreview } from './MarkdownPreview'
 // Notes book ID constant
 const NOTES_BOOK_ID = '__notes__'
 
+// Helper function to check if error is session expired
+function isSessionExpiredError(error: any): boolean {
+  const message = error?.message || String(error)
+  return message.includes('未登录') || message.includes('会话已过期') || message.includes('session expired')
+}
+
 interface MainLayoutProps {
   session: Session
   onLogout: () => void
@@ -196,13 +202,18 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       if (bookList.length > 0 && !selectedBookId) {
         setSelectedBookId(bookList[0].id)
       }
-    } catch (error) {
-      showToast('error', '获取知识库失败')
+    } catch (error: any) {
+      if (isSessionExpiredError(error)) {
+        showToast('error', '登录已过期，请重新登录')
+        onLogout()
+      } else {
+        showToast('error', '获取知识库失败')
+      }
       console.error('Failed to load books:', error)
     } finally {
       setLoadingBooks(false)
     }
-  }, [listBooks, setBooks, setLoadingBooks, selectedBookId, setSelectedBookId, showToast])
+  }, [listBooks, setBooks, setLoadingBooks, selectedBookId, setSelectedBookId, showToast, onLogout])
 
   // Load documents when book is selected
   useEffect(() => {
@@ -221,13 +232,18 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       if (bookId === NOTES_BOOK_ID) {
         setNotesHasMore(true)
       }
-    } catch (error) {
-      showToast('error', '获取文档列表失败')
+    } catch (error: any) {
+      if (isSessionExpiredError(error)) {
+        showToast('error', '登录已过期，请重新登录')
+        onLogout()
+      } else {
+        showToast('error', '获取文档列表失败')
+      }
       console.error('Failed to load documents:', error)
     } finally {
       setLoadingDocs(false)
     }
-  }, [getBookDocs, setDocuments, setLoadingDocs, showToast])
+  }, [getBookDocs, setDocuments, setLoadingDocs, showToast, onLogout])
 
   // Load more notes (lazy loading)
   const handleLoadMoreNotes = useCallback(async () => {
@@ -277,7 +293,12 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     onError: (error) => {
       setRunning(false)
       setProgress(null)
-      showToast('error', error.message)
+      if (isSessionExpiredError(error)) {
+        showToast('error', '登录已过期，请重新登录')
+        onLogout()
+      } else {
+        showToast('error', error.message)
+      }
     }
   })
 
@@ -297,11 +318,16 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       }
       
       await startSync({ bookIds: [selectedBookId], force })
-    } catch (error) {
+    } catch (error: any) {
       setRunning(false)
-      showToast('error', '启动同步失败')
+      if (isSessionExpiredError(error)) {
+        showToast('error', '登录已过期，请重新登录')
+        onLogout()
+      } else {
+        showToast('error', '启动同步失败')
+      }
     }
-  }, [selectedBookId, startSync, setRunning, showToast, getAllNotesForSync])
+  }, [selectedBookId, startSync, setRunning, showToast, getAllNotesForSync, onLogout])
 
   // Handle global sync (sync all books)
   const handleGlobalSync = useCallback(async (force = false) => {
@@ -321,11 +347,16 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       
       const allBookIds = books.map(b => b.id)
       await startSync({ bookIds: allBookIds, force })
-    } catch (error) {
+    } catch (error: any) {
       setRunning(false)
-      showToast('error', '启动全局同步失败')
+      if (isSessionExpiredError(error)) {
+        showToast('error', '登录已过期，请重新登录')
+        onLogout()
+      } else {
+        showToast('error', '启动全局同步失败')
+      }
     }
-  }, [books, startSync, setRunning, showToast, getAllNotesForSync])
+  }, [books, startSync, setRunning, showToast, getAllNotesForSync, onLogout])
 
   // Handle cancel sync
   const handleCancelSync = useCallback(async () => {
