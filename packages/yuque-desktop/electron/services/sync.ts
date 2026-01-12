@@ -45,6 +45,17 @@ let shouldCancel = false
 let currentSyncHistoryId: number | null = null
 let currentSyncSessionId: number | null = null
 
+// Sync queue
+interface QueuedSync {
+  options: SyncOptions
+  bookInfoMap: Map<string, { userLogin: string; slug: string; name: string }>
+  onProgress?: ProgressCallback
+  resolve: (result: SyncResult) => void
+  reject: (error: Error) => void
+}
+const syncQueue: QueuedSync[] = []
+let isProcessingQueue = false
+
 // Progress callback type
 type ProgressCallback = (progress: SyncProgress) => void
 
@@ -500,7 +511,8 @@ export function getSyncStatus() {
   return {
     isRunning: isSyncing,
     currentSyncHistoryId,
-    currentSyncSessionId
+    currentSyncSessionId,
+    queueLength: syncQueue.length
   }
 }
 
@@ -659,7 +671,30 @@ export async function syncSingleDocument(
 }
 
 /**
- * Start incremental sync
+ * Process sync queue
+ */
+async function processQueue(): Promise<void> {
+  if (isProcessingQueue || syncQueue.length === 0) {
+    return
+  }
+  
+  isProcessingQueue = true
+  
+  while (syncQueue.length > 0) {
+    const task = syncQueue.shift()!
+    try {
+      const result = await executeSync(task.options, task.bookInfoMap, task.onProgress)
+      task.resolve(result)
+    } catch (error) {
+      task.reject(error instanceof Error ? error : new Error(String(error)))
+    }
+  }
+  
+  isProcessingQueue = false
+}
+
+/**
+ * Start incremental sync (with queue support)
  * Requirements: 4.2, 4.6, 7.1, 7.2, 7.3
  */
 export async function startSync(
@@ -667,16 +702,26 @@ export async function startSync(
   bookInfoMap: Map<string, { userLogin: string; slug: string; name: string }>,
   onProgress?: ProgressCallback
 ): Promise<SyncResult> {
+  // If already syncing, add to queue
   if (isSyncing) {
-    return {
-      success: false,
-      totalDocs: 0,
-      syncedDocs: 0,
-      failedDocs: 0,
-      errors: ['同步正在进行中']
-    }
+    console.log('[startSync] Already syncing, adding to queue')
+    return new Promise((resolve, reject) => {
+      syncQueue.push({ options, bookInfoMap, onProgress, resolve, reject })
+    })
   }
+  
+  // Execute immediately
+  return executeSync(options, bookInfoMap, onProgress)
+}
 
+/**
+ * Execute sync (internal function)
+ */
+async function executeSync(
+  options: SyncOptions,
+  bookInfoMap: Map<string, { userLogin: string; slug: string; name: string }>,
+  onProgress?: ProgressCallback
+): Promise<SyncResult> {
   isSyncing = true
   shouldCancel = false
 
@@ -1005,5 +1050,11 @@ export async function startSync(
     isSyncing = false
     shouldCancel = false
     currentSyncHistoryId = null
+    
+    // Process next item in queue
+    if (syncQueue.length > 0) {
+      console.log(`[executeSync] Processing next in queue, ${syncQueue.length} remaining`)
+      processQueue()
+    }
   }
 }

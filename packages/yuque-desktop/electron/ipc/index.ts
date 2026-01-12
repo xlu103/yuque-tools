@@ -600,12 +600,18 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       const fs = await import('fs')
       const path = await import('path')
       
-      if (!fs.existsSync(filePath)) {
-        return { success: false, error: '文件不存在' }
+      // 规范化路径：处理跨平台路径分隔符
+      // 先将所有正斜杠转为系统分隔符，然后用 path.normalize 规范化
+      const normalizedPath = path.normalize(filePath.replace(/\//g, path.sep))
+      console.log('file:readImage normalized path:', normalizedPath)
+      
+      if (!fs.existsSync(normalizedPath)) {
+        console.error('file:readImage file not found:', normalizedPath)
+        return { success: false, error: `文件不存在: ${normalizedPath}` }
       }
       
-      const buffer = fs.readFileSync(filePath)
-      const ext = path.extname(filePath).toLowerCase()
+      const buffer = fs.readFileSync(normalizedPath)
+      const ext = path.extname(normalizedPath).toLowerCase()
       
       // 根据扩展名确定 MIME 类型
       const mimeTypes: Record<string, string> = {

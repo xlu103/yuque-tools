@@ -262,10 +262,14 @@ export async function processDocumentImages(
     // Check if already downloaded
     const existingResource = getResourceByUrl(url)
     if (existingResource && existingResource.status === 'downloaded' && existingResource.local_path) {
-      // Use existing local path
-      const relativePath = path.relative(docDir, existingResource.local_path)
-      urlToLocalPath.set(url, relativePath)
-      continue
+      // Check if the file still exists
+      if (fs.existsSync(existingResource.local_path)) {
+        // Use existing local path - calculate relative path and normalize to forward slashes
+        const relativePath = path.relative(docDir, existingResource.local_path).split(path.sep).join('/')
+        urlToLocalPath.set(url, relativePath)
+        continue
+      }
+      // File doesn't exist anymore, will re-download below
     }
     
     // Generate unique filename

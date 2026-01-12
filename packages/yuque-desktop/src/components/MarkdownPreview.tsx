@@ -70,7 +70,10 @@ function LocalImage({ src, alt, fileDir }: { src?: string; alt?: string; fileDir
   const [error, setError] = useState(false)
 
   useEffect(() => {
+    console.log('[LocalImage] useEffect triggered, src:', src, 'fileDir:', fileDir)
+    
     if (!src) {
+      console.log('[LocalImage] No src provided')
       setError(true)
       setLoading(false)
       return
@@ -78,6 +81,7 @@ function LocalImage({ src, alt, fileDir }: { src?: string; alt?: string; fileDir
 
     // 如果是网络图片或 data URL，直接使用
     if (src.startsWith('http') || src.startsWith('data:')) {
+      console.log('[LocalImage] Using remote/data URL directly')
       setImageSrc(src)
       setLoading(false)
       return
@@ -86,25 +90,34 @@ function LocalImage({ src, alt, fileDir }: { src?: string; alt?: string; fileDir
     // 本地图片，通过 IPC 读取
     const loadImage = async () => {
       try {
-        // 构建完整路径 - Windows 使用反斜杠
+        // 构建完整路径
         let fullPath: string
         if (src.startsWith('/') || src.match(/^[A-Za-z]:/)) {
+          // 绝对路径
           fullPath = src
         } else {
-          // 相对路径，拼接目录
-          fullPath = `${fileDir}\\${src.replace(/\//g, '\\')}`
+          // 相对路径，需要拼接目录
+          // 统一使用正斜杠拼接，然后让主进程处理路径规范化
+          // 先将 fileDir 和 src 中的反斜杠都转为正斜杠
+          const normalizedDir = fileDir.replace(/\\/g, '/')
+          const normalizedSrc = src.replace(/\\/g, '/')
+          fullPath = `${normalizedDir}/${normalizedSrc}`
         }
         
-        console.log('[LocalImage] Loading:', fullPath)
+        console.log('[LocalImage] Calling IPC file:readImage with path:', fullPath)
         const result = await window.electronAPI['file:readImage'](fullPath)
+        console.log('[LocalImage] IPC result:', { success: result.success, hasDataUrl: !!result.dataUrl, error: result.error })
+        
         if (result.success && result.dataUrl) {
+          console.log('[LocalImage] Setting image src, dataUrl length:', result.dataUrl.length)
           setImageSrc(result.dataUrl)
+          setError(false)
         } else {
-          console.error('[LocalImage] Failed:', result.error)
+          console.error('[LocalImage] Failed:', result.error, 'path:', fullPath)
           setError(true)
         }
       } catch (err) {
-        console.error('[LocalImage] Error:', err)
+        console.error('[LocalImage] Exception:', err)
         setError(true)
       } finally {
         setLoading(false)
@@ -114,6 +127,8 @@ function LocalImage({ src, alt, fileDir }: { src?: string; alt?: string; fileDir
     loadImage()
   }, [src, fileDir])
 
+  console.log('[LocalImage] Render state - loading:', loading, 'error:', error, 'hasImageSrc:', !!imageSrc)
+
   if (loading) {
     return <span className="inline-block w-16 h-16 bg-bg-tertiary rounded animate-pulse" />
   }
@@ -121,7 +136,7 @@ function LocalImage({ src, alt, fileDir }: { src?: string; alt?: string; fileDir
   if (error || !imageSrc) {
     return (
       <span className="inline-flex items-center gap-1 px-2 py-1 bg-bg-tertiary rounded text-xs text-text-tertiary">
-        📷 图片加载失败
+        📷 图片加载失败 (src: {src})
       </span>
     )
   }
