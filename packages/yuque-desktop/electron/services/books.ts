@@ -306,6 +306,7 @@ function transformTocToDocument(
 
 /**
  * Flatten TOC tree to document list
+ * Handles both nested (children array) and flat (parent_uuid) TOC structures
  */
 function flattenToc(
   tocItems: any[],
@@ -315,16 +316,42 @@ function flattenToc(
 ): Document[] {
   const documents: Document[] = []
   
-  tocItems.forEach((item, index) => {
-    const doc = transformTocToDocument(item, bookId, parentUuid, depth, index)
-    documents.push(doc)
+  // Check if TOC is nested (has children) or flat (has parent_uuid)
+  const hasNestedStructure = tocItems.some(item => item.children && item.children.length > 0)
+  
+  if (hasNestedStructure) {
+    // Handle nested TOC structure
+    tocItems.forEach((item, index) => {
+      const doc = transformTocToDocument(item, bookId, parentUuid, depth, index)
+      documents.push(doc)
+      
+      // Recursively process children
+      if (item.children && item.children.length > 0) {
+        const childDocs = flattenToc(item.children, bookId, item.uuid, depth + 1)
+        documents.push(...childDocs)
+      }
+    })
+  } else {
+    // Handle flat TOC structure (parent_uuid based)
+    // First, create all documents
+    const allDocs: Document[] = tocItems.map((item, index) => ({
+      id: String(item.id || item.uuid),
+      bookId: bookId,
+      slug: item.url || item.slug || `folder_${item.uuid || item.id || index}`,
+      title: item.title || '未命名',
+      uuid: item.uuid || null,
+      parentUuid: item.parent_uuid || null,
+      childUuid: item.child_uuid || null,
+      docType: item.type === 'TITLE' ? 'TITLE' as const : 'DOC' as const,
+      depth: item.depth ?? 0,
+      sortOrder: index,
+      remoteCreatedAt: item.created_at || new Date().toISOString(),
+      remoteUpdatedAt: item.content_updated_at || item.updated_at || new Date().toISOString(),
+      syncStatus: 'new' as const
+    }))
     
-    // Recursively process children
-    if (item.children && item.children.length > 0) {
-      const childDocs = flattenToc(item.children, bookId, item.uuid, depth + 1)
-      documents.push(...childDocs)
-    }
-  })
+    return allDocs
+  }
   
   return documents
 }

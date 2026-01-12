@@ -73,7 +73,8 @@ const createWindow = () => {
     webPreferences: {
       preload: join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      webSecurity: false  // 允许加载本地 file:// 资源
     }
   })
 

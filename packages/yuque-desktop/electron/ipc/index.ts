@@ -181,6 +181,8 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       const docsToStore: DocumentInput[] = docs.map((doc) => {
         const existing = existingDocsMap.get(doc.id)
         let syncStatus: 'synced' | 'pending' | 'modified' | 'new' | 'deleted' | 'failed' = 'new'
+        let localPath: string | undefined = undefined
+        let localSyncedAt: string | undefined = undefined
         
         if (existing) {
           // Preserve failed status for regular books, but reset for notes
@@ -194,6 +196,9 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
             }
           } else if (existing.sync_status === 'synced') {
             syncStatus = 'synced'
+            // Preserve local path and sync time for synced documents
+            localPath = existing.local_path || undefined
+            localSyncedAt = existing.local_synced_at || undefined
           }
         }
         
@@ -209,6 +214,8 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
           depth: doc.depth,
           sortOrder: doc.sortOrder,
           remoteUpdatedAt: doc.remoteUpdatedAt,
+          localPath: localPath,
+          localSyncedAt: localSyncedAt,
           syncStatus: syncStatus
         }
       })
@@ -242,7 +249,25 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
       upsertDocuments(docsToStore)
       console.log(`Fetched and stored ${docs.length} documents for book ${bookId}`)
       
-      return docs
+      // Return documents with correct sync status and local path
+      const result: Document[] = docsToStore.map(doc => ({
+        id: doc.id,
+        bookId: doc.bookId,
+        slug: doc.slug,
+        title: doc.title,
+        uuid: doc.uuid || undefined,
+        parentUuid: doc.parentUuid || undefined,
+        childUuid: doc.childUuid || undefined,
+        docType: doc.docType,
+        depth: doc.depth,
+        sortOrder: doc.sortOrder,
+        remoteUpdatedAt: doc.remoteUpdatedAt || '',
+        localPath: doc.localPath,
+        localSyncedAt: doc.localSyncedAt,
+        syncStatus: doc.syncStatus || 'new'
+      }))
+      
+      return result
     } catch (error) {
       console.error('Failed to fetch docs:', error)
       throw error
@@ -470,6 +495,43 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
   ipcMain.handle('file:readContent', async (_event, filePath: string): Promise<{ success: boolean; content?: string; error?: string }> => {
     console.log('file:readContent called for:', filePath)
     return await readFileContent(filePath)
+  })
+
+  // 读取图片文件并返回 base64 数据
+  ipcMain.handle('file:readImage', async (_event, filePath: string): Promise<{ success: boolean; dataUrl?: string; error?: string }> => {
+    console.log('file:readImage called for:', filePath)
+    try {
+      const fs = await import('fs')
+      const path = await import('path')
+      
+      if (!fs.existsSync(filePath)) {
+        return { success: false, error: '文件不存在' }
+      }
+      
+      const buffer = fs.readFileSync(filePath)
+      const ext = path.extname(filePath).toLowerCase()
+      
+      // 根据扩展名确定 MIME 类型
+      const mimeTypes: Record<string, string> = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.svg': 'image/svg+xml',
+        '.bmp': 'image/bmp',
+        '.ico': 'image/x-icon'
+      }
+      
+      const mimeType = mimeTypes[ext] || 'image/png'
+      const base64 = buffer.toString('base64')
+      const dataUrl = `data:${mimeType};base64,${base64}`
+      
+      return { success: true, dataUrl }
+    } catch (error) {
+      console.error('Failed to read image:', error)
+      return { success: false, error: String(error) }
+    }
   })
 
   // ============================================
