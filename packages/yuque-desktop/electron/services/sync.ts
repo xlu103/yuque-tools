@@ -555,6 +555,110 @@ export function clearInterruptedSession(sessionId: number): void {
 }
 
 /**
+ * Sync a single document immediately
+ * Used for click-to-sync and force re-sync from context menu
+ */
+export async function syncSingleDocument(
+  bookId: string,
+  docId: string,
+  bookInfo: { userLogin: string; slug: string; name: string },
+  force: boolean = false
+): Promise<{ success: boolean; localPath?: string; error?: string }> {
+  const settings = getAppSettings()
+  const syncDirectory = settings.syncDirectory
+  
+  if (!syncDirectory) {
+    return { success: false, error: '请先设置同步目录' }
+  }
+  
+  const linebreak = settings.linebreak
+  const latexcode = settings.latexcode
+  
+  try {
+    // Get document info from database
+    const docs = getDocumentsByBookId(bookId)
+    const doc = docs.find(d => d.id === docId)
+    
+    if (!doc) {
+      return { success: false, error: '文档不存在' }
+    }
+    
+    // Skip if already synced and not force
+    if (!force && doc.sync_status === 'synced' && doc.local_path) {
+      return { success: true, localPath: doc.local_path }
+    }
+    
+    console.log(`[syncSingleDocument] Syncing doc: ${doc.title} (${docId}), force: ${force}`)
+    
+    // Download content
+    let content: string
+    if (bookId === NOTES_BOOK_ID) {
+      content = await downloadNoteContent(docId)
+    } else {
+      content = await downloadDocumentContent(
+        bookInfo.userLogin,
+        bookInfo.slug,
+        doc.slug,
+        linebreak,
+        latexcode
+      )
+    }
+    
+    // Sanitize filenames
+    const sanitizedTitle = doc.title.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    const sanitizedBookName = bookInfo.name.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    const filePath = path.join(syncDirectory, sanitizedBookName, `${sanitizedTitle}.md`)
+    const docDir = path.dirname(filePath)
+    
+    // Process images
+    let processedContent = content
+    try {
+      processedContent = await processDocumentImages(content, docId, docDir)
+    } catch (imgError) {
+      console.error(`[syncSingleDocument] Image processing failed:`, imgError)
+    }
+    
+    // Process attachments
+    try {
+      processedContent = await processDocumentAttachments(processedContent, docId, docDir)
+    } catch (attError) {
+      console.error(`[syncSingleDocument] Attachment processing failed:`, attError)
+    }
+    
+    // Write to file
+    writeDocumentToFile(filePath, processedContent)
+    
+    // Set file timestamps
+    const createdAt = doc.remote_updated_at || new Date().toISOString()
+    setFileTimestamps(filePath, createdAt, createdAt)
+    
+    // Update database
+    const now = new Date().toISOString()
+    upsertDocument({
+      id: docId,
+      bookId: bookId,
+      slug: doc.slug,
+      title: doc.title,
+      localPath: filePath,
+      remoteUpdatedAt: doc.remote_updated_at || '',
+      localSyncedAt: now,
+      syncStatus: 'synced'
+    })
+    
+    console.log(`[syncSingleDocument] Successfully synced: ${doc.title}`)
+    return { success: true, localPath: filePath }
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
+    console.error(`[syncSingleDocument] Failed:`, errorMsg)
+    
+    // Mark as failed
+    updateDocumentSyncStatus(docId, 'failed')
+    
+    return { success: false, error: errorMsg }
+  }
+}
+
+/**
  * Start incremental sync
  * Requirements: 4.2, 4.6, 7.1, 7.2, 7.3
  */

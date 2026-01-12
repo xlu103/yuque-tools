@@ -363,12 +363,45 @@
   }
 }
 
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    transform: translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
   }
   to {
     opacity: 1;
+  }
+}
+
+@keyframes fade-in-scale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -381,16 +414,120 @@
   }
 }
 
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes context-menu-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-5px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
 .animate-slide-in-right {
   animation: slide-in-right 0.3s var(--ease-spring);
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left 0.2s var(--ease-mac);
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up 0.2s var(--ease-mac);
 }
 
 .animate-fade-in {
   animation: fade-in 0.2s var(--ease-mac);
 }
 
+.animate-fade-in-scale {
+  animation: fade-in-scale 0.2s var(--ease-spring);
+}
+
 .animate-spin {
   animation: spin 1s linear infinite;
+}
+
+.animate-pulse {
+  animation: pulse 2s var(--ease-mac) infinite;
+}
+
+.animate-context-menu-in {
+  animation: context-menu-in 0.15s var(--ease-spring);
+}
+
+.animate-bounce-in {
+  animation: bounce-in 0.4s var(--ease-spring);
+}
+
+/* Skeleton loading shimmer */
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-secondary) 25%,
+    var(--color-bg-tertiary) 50%,
+    var(--color-bg-secondary) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Smooth transitions for interactive elements */
+.transition-smooth {
+  transition: all var(--transition-normal) var(--ease-mac);
+}
+
+.transition-fast {
+  transition: all var(--transition-fast) var(--ease-mac);
+}
+
+/* Hover scale effect */
+.hover-scale {
+  transition: transform var(--transition-fast) var(--ease-spring);
+}
+
+.hover-scale:hover {
+  transform: scale(1.02);
+}
+
+.hover-scale:active {
+  transform: scale(0.98);
 }
 
 

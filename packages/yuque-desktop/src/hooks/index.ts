@@ -37,5 +37,7 @@ export type {
   SearchOptions,
   SearchResult,
   InterruptedSession,
-  SyncStatistics
+  SyncStatistics,
+  SingleDocSyncOptions,
+  SingleDocSyncResult
 } from './useIPC'

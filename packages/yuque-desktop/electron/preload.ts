@@ -30,6 +30,7 @@ const electronAPI: IPCInvokeAPI & IPCEventAPI = {
 
   // Sync
   'sync:start': (options) => ipcRenderer.invoke('sync:start', options),
+  'sync:singleDoc': (options) => ipcRenderer.invoke('sync:singleDoc', options),
   'sync:cancel': () => ipcRenderer.invoke('sync:cancel'),
   'sync:getStatus': () => ipcRenderer.invoke('sync:getStatus'),
   'sync:getChanges': (bookIds) => ipcRenderer.invoke('sync:getChanges', bookIds),

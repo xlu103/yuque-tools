@@ -14,7 +14,9 @@ import type {
   SearchOptions,
   SearchResult,
   InterruptedSession,
-  SyncStatistics
+  SyncStatistics,
+  SingleDocSyncOptions,
+  SingleDocSyncResult
 } from '@electron/ipc/types'
 
 // Re-export types for convenience
@@ -32,7 +34,9 @@ export type {
   SearchOptions,
   SearchResult,
   InterruptedSession,
-  SyncStatistics
+  SyncStatistics,
+  SingleDocSyncOptions,
+  SingleDocSyncResult
 }
 
 /**
@@ -154,6 +158,14 @@ export function useSync() {
     [isElectron]
   )
 
+  const syncSingleDoc = useCallback(
+    async (options: SingleDocSyncOptions): Promise<SingleDocSyncResult> => {
+      if (!isElectron) throw new Error('Not in Electron environment')
+      return window.electronAPI['sync:singleDoc'](options)
+    },
+    [isElectron]
+  )
+
   const cancelSync = useCallback(async (): Promise<void> => {
     if (!isElectron) throw new Error('Not in Electron environment')
     return window.electronAPI['sync:cancel']()
@@ -172,7 +184,7 @@ export function useSync() {
     [isElectron]
   )
 
-  return { startSync, cancelSync, getSyncStatus, getChanges, isElectron }
+  return { startSync, syncSingleDoc, cancelSync, getSyncStatus, getChanges, isElectron }
 }
 
 /**

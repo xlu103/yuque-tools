@@ -68,9 +68,6 @@ function App() {
       setSessionExpired(true)
     })
 
-    // Also check for session expiration errors in IPC calls
-    const originalInvoke = window.electronAPI
-    
     // Create a global error handler
     const handleError = (error: any) => {
       const errorMessage = error?.message || String(error)

@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useEffect } from 'react'
+import { useCallback, useMemo, useEffect, useState } from 'react'
 import type { Document } from '../hooks'
-import { useIsElectron } from '../hooks'
+import { useIsElectron, useSync, useToast } from '../hooks'
 import { useTreeCollapseStore } from '../stores'
+import { ContextMenu, useContextMenu, type ContextMenuItem } from './ui/ContextMenu'
 
 interface DocumentTreeProps {
   documents: Document[]
@@ -11,8 +12,9 @@ interface DocumentTreeProps {
   onSelectionChange?: (ids: Set<string>) => void
   selectable?: boolean
   bookInfo?: { userLogin: string; slug: string }
-  bookId?: string  // 新增：用于折叠状态持久化
+  bookId?: string
   onPreview?: (doc: Document) => void
+  onDocumentSynced?: (doc: Document) => void
 }
 
 interface TreeNode extends Document {
@@ -29,53 +31,39 @@ const statusConfig = {
   failed: { label: '同步失败', color: 'text-error', bg: 'bg-error/10' }
 }
 
-/**
- * Build tree structure from flat document list
- */
 function buildDocumentTree(documents: Document[]): TreeNode[] {
-  // Create maps for quick lookup - index by both uuid and id
   const nodesByUuid = new Map<string, TreeNode>()
   const nodesById = new Map<string, TreeNode>()
   const rootNodes: TreeNode[] = []
 
-  // First pass: create all nodes and index them
   documents.forEach(doc => {
     const node: TreeNode = {
       ...doc,
       children: [],
       level: doc.depth || 0
     }
-    
-    // Index by id (always available)
     nodesById.set(doc.id, node)
-    
-    // Also index by uuid if available
     if (doc.uuid) {
       nodesByUuid.set(doc.uuid, node)
     }
   })
 
-  // Second pass: build tree structure
   documents.forEach(doc => {
     const node = nodesById.get(doc.id)
     if (!node) return
 
     if (doc.parentUuid) {
-      // Try to find parent by uuid first, then by id
       const parent = nodesByUuid.get(doc.parentUuid) || nodesById.get(doc.parentUuid)
       if (parent) {
         parent.children.push(node)
       } else {
-        // Parent not found, treat as root
         rootNodes.push(node)
       }
     } else {
-      // No parent, it's a root node
       rootNodes.push(node)
     }
   })
 
-  // Sort root nodes and children by sortOrder
   const sortNodes = (nodes: TreeNode[]) => {
     nodes.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0))
     nodes.forEach(node => {
@@ -86,7 +74,6 @@ function buildDocumentTree(documents: Document[]): TreeNode[] {
   }
   
   sortNodes(rootNodes)
-
   return rootNodes
 }
 
@@ -100,10 +87,13 @@ function DocumentTreeNode({
   onOpenFile,
   onOpenInYuque,
   onShowInFolder,
+  onSyncDocument,
+  onContextMenu,
   bookInfo,
   bookId,
   isCollapsed,
-  onToggleCollapse
+  onToggleCollapse,
+  syncingDocId
 }: {
   node: TreeNode
   isSelected: boolean
@@ -114,43 +104,54 @@ function DocumentTreeNode({
   onOpenFile: (doc: Document) => void
   onOpenInYuque: (doc: Document) => void
   onShowInFolder: (doc: Document) => void
+  onSyncDocument: (doc: Document, force?: boolean, autoPreview?: boolean) => void
+  onContextMenu: (e: React.MouseEvent, doc: Document) => void
   bookInfo?: { userLogin: string; slug: string }
   bookId?: string
   isCollapsed: boolean
   onToggleCollapse: () => void
+  syncingDocId: string | null
 }) {
   const hasChildren = node.children.length > 0
   const isSynced = node.syncStatus === 'synced' && node.localPath
   const status = statusConfig[node.syncStatus]
-  const isFolder = node.docType === 'TITLE' || hasChildren  // 有子节点也算文件夹
+  const isFolder = node.docType === 'TITLE' || hasChildren
   const { isCollapsed: checkCollapsed, toggleNode, saveCollapseState } = useTreeCollapseStore()
+  const isSyncing = syncingDocId === node.id
+
+  const handleClick = () => {
+    if (selectable) {
+      onToggleSelect(node.id)
+    } else if (hasChildren) {
+      onToggleCollapse()
+    } else if (isFolder) {
+      // Do nothing for folders
+    } else if (!isSynced && node.syncStatus !== 'synced') {
+      // Click to sync unsynced documents
+      onSyncDocument(node)
+    } else if (isSynced && onPreview) {
+      onPreview(node)
+    }
+  }
 
   return (
-    <div>
+    <div className="animate-fade-in">
       <div
-        className={`px-4 py-2 hover:bg-bg-secondary transition-colors duration-150 group cursor-pointer flex items-start gap-2 ${
+        className={`px-4 py-2 hover:bg-bg-secondary transition-all duration-150 group cursor-pointer flex items-start gap-2 ${
           isSelected ? 'bg-accent/5' : ''
-        }`}
+        } ${isSyncing ? 'bg-accent/5' : ''}`}
         style={{ paddingLeft: `${16 + node.level * 20}px` }}
-        onClick={() => {
-          if (selectable) {
-            onToggleSelect(node.id)
-          } else if (hasChildren) {
-            // 单击有子节点的项目直接折叠/展开
-            onToggleCollapse()
-          } else if (isSynced && onPreview && !isFolder) {
-            onPreview(node)
-          }
-        }}
+        onClick={handleClick}
+        onContextMenu={(e) => !isFolder && onContextMenu(e, node)}
       >
-        {/* Expand/collapse indicator - 点击可折叠 */}
+        {/* Expand/collapse indicator */}
         {hasChildren ? (
           <button
             onClick={(e) => {
               e.stopPropagation()
               onToggleCollapse()
             }}
-            className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded mt-0.5"
+            className="flex-shrink-0 w-5 h-5 flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded mt-0.5 transition-colors"
           >
             <svg
               className={`w-4 h-4 transition-transform duration-200 ${!isCollapsed ? 'rotate-90' : ''}`}
@@ -176,10 +177,12 @@ function DocumentTreeNode({
           />
         )}
 
-        {/* Document icon */}
-        <div className="flex-shrink-0 mt-0.5">
-          {isFolder ? (
-            <svg className="w-5 h-5 text-warning" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        {/* Document icon with sync animation */}
+        <div className="flex-shrink-0 mt-0.5 relative">
+          {isSyncing ? (
+            <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+          ) : isFolder ? (
+            <svg className="w-5 h-5 text-warning transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -188,7 +191,7 @@ function DocumentTreeNode({
               />
             </svg>
           ) : (
-            <svg className="w-5 h-5 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-5 h-5 text-text-tertiary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -201,7 +204,7 @@ function DocumentTreeNode({
 
         {/* Document info */}
         <div className="flex-1 min-w-0">
-          <h3 className={`text-sm font-medium text-text-primary truncate ${isFolder ? 'font-semibold' : ''}`}>
+          <h3 className={`text-sm font-medium text-text-primary truncate transition-colors ${isFolder ? 'font-semibold' : ''}`}>
             {node.title}
           </h3>
           {!isFolder && node.localSyncedAt && (
@@ -219,24 +222,19 @@ function DocumentTreeNode({
 
         {/* Action buttons */}
         {!isFolder && (
-          <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
             {isSynced && onPreview && (
               <button
                 onClick={(e) => {
                   e.stopPropagation()
                   onPreview(node)
                 }}
-                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
                 title="预览"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                 </svg>
               </button>
             )}
@@ -247,36 +245,11 @@ function DocumentTreeNode({
                   e.stopPropagation()
                   onOpenFile(node)
                 }}
-                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
                 title="打开文件"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
-                  />
-                </svg>
-              </button>
-            )}
-
-            {isSynced && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onShowInFolder(node)
-                }}
-                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
-                title="在文件夹中显示"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                 </svg>
               </button>
             )}
@@ -287,16 +260,11 @@ function DocumentTreeNode({
                   e.stopPropagation()
                   onOpenInYuque(node)
                 }}
-                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary"
+                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
                 title="在语雀中打开"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"
-                  />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
                 </svg>
               </button>
             )}
@@ -305,15 +273,15 @@ function DocumentTreeNode({
 
         {/* Status badge - only show for documents, not folders */}
         {!isFolder && (
-          <div className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium ${status.color} ${status.bg}`}>
-            {status.label}
+          <div className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium transition-colors ${status.color} ${status.bg}`}>
+            {isSyncing ? '同步中...' : status.label}
           </div>
         )}
       </div>
 
-      {/* Render children */}
+      {/* Render children with animation */}
       {hasChildren && !isCollapsed && (
-        <div>
+        <div className="animate-slide-in-up">
           {node.children.map((child) => {
             const childIsCollapsed = bookId ? checkCollapsed(bookId, child.id) : false
             return (
@@ -328,6 +296,8 @@ function DocumentTreeNode({
                 onOpenFile={onOpenFile}
                 onOpenInYuque={onOpenInYuque}
                 onShowInFolder={onShowInFolder}
+                onSyncDocument={onSyncDocument}
+                onContextMenu={onContextMenu}
                 bookInfo={bookInfo}
                 bookId={bookId}
                 isCollapsed={childIsCollapsed}
@@ -337,6 +307,7 @@ function DocumentTreeNode({
                     saveCollapseState(bookId)
                   }
                 }}
+                syncingDocId={syncingDocId}
               />
             )
           })}
@@ -355,9 +326,15 @@ export function DocumentTree({
   selectable = false,
   bookInfo,
   bookId,
-  onPreview
+  onPreview,
+  onDocumentSynced
 }: DocumentTreeProps) {
   const isElectron = useIsElectron()
+  const { syncSingleDoc } = useSync()
+  const { showToast } = useToast()
+  const { contextMenu, showContextMenu, hideContextMenu } = useContextMenu()
+  const [syncingDocId, setSyncingDocId] = useState<string | null>(null)
+  
   const { 
     isCollapsed, 
     toggleNode, 
@@ -367,18 +344,14 @@ export function DocumentTree({
     saveCollapseState 
   } = useTreeCollapseStore()
 
-  // Build tree structure
-  const tree = useMemo(() => {
-    return buildDocumentTree(documents)
-  }, [documents])
+  const tree = useMemo(() => buildDocumentTree(documents), [documents])
 
-  // Get all folder node IDs for collapse all functionality (use id for consistency)
   const folderNodeIds = useMemo(() => {
     const ids: string[] = []
     const collectFolderIds = (nodes: TreeNode[]) => {
       nodes.forEach(node => {
         if (node.children.length > 0) {
-          ids.push(node.id)  // Use id instead of uuid
+          ids.push(node.id)
           collectFolderIds(node.children)
         }
       })
@@ -387,14 +360,12 @@ export function DocumentTree({
     return ids
   }, [tree])
 
-  // Load collapse state when bookId changes
   useEffect(() => {
     if (bookId) {
       loadCollapseState(bookId)
     }
   }, [bookId, loadCollapseState])
 
-  // Handle collapse all
   const handleCollapseAll = useCallback(() => {
     if (bookId) {
       collapseAll(bookId, folderNodeIds)
@@ -402,7 +373,6 @@ export function DocumentTree({
     }
   }, [bookId, folderNodeIds, collapseAll, saveCollapseState])
 
-  // Handle expand all
   const handleExpandAll = useCallback(() => {
     if (bookId) {
       expandAll(bookId)
@@ -410,76 +380,96 @@ export function DocumentTree({
     }
   }, [bookId, expandAll, saveCollapseState])
 
-  // File operations
-  const handleOpenFile = useCallback(
-    async (doc: Document) => {
-      if (!isElectron || !doc.localPath) return
-      try {
-        const result = await window.electronAPI['file:open'](doc.localPath)
-        if (!result.success) {
-          console.error('Failed to open file:', result.error)
+  // Sync single document
+  const handleSyncDocument = useCallback(async (doc: Document, force: boolean = false, autoPreview: boolean = true) => {
+    if (!bookId || syncingDocId) return
+    
+    setSyncingDocId(doc.id)
+    try {
+      const result = await syncSingleDoc({
+        bookId,
+        docId: doc.id,
+        force
+      })
+      
+      if (result.success && result.localPath) {
+        showToast('success', `已同步: ${doc.title}`)
+        const syncedDoc = { ...doc, localPath: result.localPath, syncStatus: 'synced' as const }
+        
+        // Notify parent to refresh document list
+        if (onDocumentSynced) {
+          onDocumentSynced(syncedDoc)
         }
-      } catch (error) {
-        console.error('Failed to open file:', error)
-      }
-    },
-    [isElectron]
-  )
-
-  const handleOpenInYuque = useCallback(
-    async (doc: Document) => {
-      if (!isElectron || !bookInfo) return
-      try {
-        const result = await window.electronAPI['file:openInYuque']({
-          userLogin: bookInfo.userLogin,
-          bookSlug: bookInfo.slug,
-          docSlug: doc.slug
-        })
-        if (!result.success) {
-          console.error('Failed to open in Yuque:', result.error)
+        
+        // Auto open preview after sync (for click-to-sync)
+        if (autoPreview && onPreview) {
+          onPreview(syncedDoc)
         }
-      } catch (error) {
-        console.error('Failed to open in Yuque:', error)
-      }
-    },
-    [isElectron, bookInfo]
-  )
-
-  const handleShowInFolder = useCallback(
-    async (doc: Document) => {
-      if (!isElectron || !doc.localPath) return
-      try {
-        const result = await window.electronAPI['file:showInFolder'](doc.localPath)
-        if (!result.success) {
-          console.error('Failed to show in folder:', result.error)
-        }
-      } catch (error) {
-        console.error('Failed to show in folder:', error)
-      }
-    },
-    [isElectron]
-  )
-
-  const handleToggleSelect = useCallback(
-    (docId: string) => {
-      if (!onSelectionChange) return
-
-      const newSelection = new Set(selectedIds)
-      if (newSelection.has(docId)) {
-        newSelection.delete(docId)
       } else {
-        newSelection.add(docId)
+        showToast('error', result.error || '同步失败')
       }
-      onSelectionChange(newSelection)
-    },
-    [selectedIds, onSelectionChange]
-  )
+    } catch (error) {
+      showToast('error', '同步失败')
+    } finally {
+      setSyncingDocId(null)
+    }
+  }, [bookId, syncSingleDoc, showToast, syncingDocId, onDocumentSynced, onPreview])
+
+  // File operations
+  const handleOpenFile = useCallback(async (doc: Document) => {
+    if (!isElectron || !doc.localPath) return
+    try {
+      const result = await window.electronAPI['file:open'](doc.localPath)
+      if (!result.success) {
+        console.error('Failed to open file:', result.error)
+      }
+    } catch (error) {
+      console.error('Failed to open file:', error)
+    }
+  }, [isElectron])
+
+  const handleOpenInYuque = useCallback(async (doc: Document) => {
+    if (!isElectron || !bookInfo) return
+    try {
+      const result = await window.electronAPI['file:openInYuque']({
+        userLogin: bookInfo.userLogin,
+        bookSlug: bookInfo.slug,
+        docSlug: doc.slug
+      })
+      if (!result.success) {
+        console.error('Failed to open in Yuque:', result.error)
+      }
+    } catch (error) {
+      console.error('Failed to open in Yuque:', error)
+    }
+  }, [isElectron, bookInfo])
+
+  const handleShowInFolder = useCallback(async (doc: Document) => {
+    if (!isElectron || !doc.localPath) return
+    try {
+      const result = await window.electronAPI['file:showInFolder'](doc.localPath)
+      if (!result.success) {
+        console.error('Failed to show in folder:', result.error)
+      }
+    } catch (error) {
+      console.error('Failed to show in folder:', error)
+    }
+  }, [isElectron])
+
+  const handleToggleSelect = useCallback((docId: string) => {
+    if (!onSelectionChange) return
+    const newSelection = new Set(selectedIds)
+    if (newSelection.has(docId)) {
+      newSelection.delete(docId)
+    } else {
+      newSelection.add(docId)
+    }
+    onSelectionChange(newSelection)
+  }, [selectedIds, onSelectionChange])
 
   const handleSelectAll = useCallback(() => {
     if (!onSelectionChange) return
-
     const allSelected = documents.every((d) => selectedIds.has(d.id))
-
     if (allSelected) {
       const newSelection = new Set(selectedIds)
       documents.forEach((d) => newSelection.delete(d.id))
@@ -491,9 +481,84 @@ export function DocumentTree({
     }
   }, [documents, selectedIds, onSelectionChange])
 
+  // Context menu handler
+  const handleContextMenu = useCallback((e: React.MouseEvent, doc: Document) => {
+    showContextMenu(e, doc)
+  }, [showContextMenu])
+
+  // Build context menu items
+  const getContextMenuItems = useCallback((doc: Document): ContextMenuItem[] => {
+    const isSynced = doc.syncStatus === 'synced' && doc.localPath
+    const items: ContextMenuItem[] = []
+
+    if (!isSynced) {
+      items.push({
+        label: '同步到本地并预览',
+        icon: (
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+        ),
+        onClick: () => handleSyncDocument(doc, false, true)
+      })
+    }
+
+    if (isSynced) {
+      items.push({
+        label: '重新同步 (覆盖本地)',
+        icon: (
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+        ),
+        onClick: () => handleSyncDocument(doc, true, false)
+      })
+
+      items.push({ label: '', divider: true, onClick: () => {} })
+
+      items.push({
+        label: '打开文件',
+        icon: (
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        ),
+        onClick: () => handleOpenFile(doc)
+      })
+
+      items.push({
+        label: '打开所在目录',
+        icon: (
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+          </svg>
+        ),
+        onClick: () => handleShowInFolder(doc)
+      })
+    }
+
+    if (bookInfo) {
+      if (items.length > 0 && !items[items.length - 1].divider) {
+        items.push({ label: '', divider: true, onClick: () => {} })
+      }
+
+      items.push({
+        label: '在浏览器中打开',
+        icon: (
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+          </svg>
+        ),
+        onClick: () => handleOpenInYuque(doc)
+      })
+    }
+
+    return items
+  }, [bookInfo, handleSyncDocument, handleOpenFile, handleShowInFolder, handleOpenInYuque])
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-full animate-fade-in">
         <div className="text-center">
           <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="mt-3 text-sm text-text-secondary">加载中...</p>
@@ -504,7 +569,7 @@ export function DocumentTree({
 
   if (documents.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-full animate-fade-in">
         <p className="text-sm text-text-secondary">{emptyMessage}</p>
       </div>
     )
@@ -575,6 +640,8 @@ export function DocumentTree({
               onOpenFile={handleOpenFile}
               onOpenInYuque={handleOpenInYuque}
               onShowInFolder={handleShowInFolder}
+              onSyncDocument={handleSyncDocument}
+              onContextMenu={handleContextMenu}
               bookInfo={bookInfo}
               bookId={bookId}
               isCollapsed={nodeIsCollapsed}
@@ -584,10 +651,21 @@ export function DocumentTree({
                   saveCollapseState(bookId)
                 }
               }}
+              syncingDocId={syncingDocId}
             />
           )
         })}
       </div>
+
+      {/* Context Menu */}
+      {contextMenu && (
+        <ContextMenu
+          items={getContextMenuItems(contextMenu.data)}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={hideContextMenu}
+        />
+      )}
     </div>
   )
 }

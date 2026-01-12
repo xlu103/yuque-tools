@@ -44,7 +44,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     setSelectedBookId, 
     setDocuments,
     setLoadingBooks,
-    setLoadingDocs,
     isLoadingBooks,
     isLoadingDocs,
     getDocumentsForBook
@@ -60,9 +59,9 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   // Panel layout state
   const {
     sidebarWidth,
-    previewWidth,
+    documentListWidth,
     setSidebarWidth,
-    setPreviewWidth,
+    setDocumentListWidth,
     loadLayout,
     saveLayout
   } = usePanelLayoutStore()
@@ -75,7 +74,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
-  const [hasExpandedForPreview, setHasExpandedForPreview] = useState(false)
   
   // Search state
   const [searchQuery, setSearchQuery] = useState('')
@@ -90,9 +88,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   
   // Network loading state (for background fetch indicator)
   const [isFetchingRemote, setIsFetchingRemote] = useState(false)
-  
-  // Settings cache
-  const [autoSyncOnOpen, setAutoSyncOnOpen] = useState(false)
   
   // Auto sync timer ref
   const autoSyncTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -123,11 +118,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   useEffect(() => {
     loadBooks()
     loadLayout() // Load saved panel layout
-    
-    // Load autoSyncOnOpen setting
-    getSettings().then(settings => {
-      setAutoSyncOnOpen(settings.autoSyncOnOpen || false)
-    }).catch(console.error)
   }, [])
 
   // Auto sync setup
@@ -181,10 +171,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       const checkAutoSyncSettings = async () => {
         try {
           const settings = await getSettings()
-          
-          // Update autoSyncOnOpen setting
-          setAutoSyncOnOpen(settings.autoSyncOnOpen || false)
-          
           const newInterval = settings.autoSyncInterval || 0
           
           if (newInterval !== autoSyncIntervalRef.current) {
@@ -784,8 +770,11 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
 
         {/* Document list and Preview panel in same horizontal container */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Document list */}
-          <div className="flex-1 overflow-auto">
+          {/* Document list with fixed width */}
+          <div 
+            style={{ width: documentListWidth }} 
+            className="flex-shrink-0 overflow-auto border-r border-border-light transition-all duration-200"
+          >
             {viewMode === 'tree' ? (
               <DocumentTree
                 documents={filteredDocs}
@@ -795,11 +784,17 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                 bookId={selectedBookId || undefined}
                 onPreview={(doc) => {
                   if (doc.localPath) {
-                    if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
-                      window.electronAPI['window:expandWidth'](500)
-                      setHasExpandedForPreview(true)
-                    }
                     setPreviewDoc({ filePath: doc.localPath, title: doc.title })
+                  }
+                }}
+                onDocumentSynced={(doc) => {
+                  // Update document in store after single doc sync
+                  if (selectedBookId) {
+                    const currentDocs = getDocumentsForBook(selectedBookId)
+                    const updatedDocs = currentDocs.map(d => 
+                      d.id === doc.id ? { ...d, ...doc } : d
+                    )
+                    setDocuments(selectedBookId, updatedDocs)
                   }
                 }}
               />
@@ -814,10 +809,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                 bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
                 onPreview={(doc) => {
                   if (doc.localPath) {
-                    if (!previewDoc && !hasExpandedForPreview && window.electronAPI) {
-                      window.electronAPI['window:expandWidth'](500)
-                      setHasExpandedForPreview(true)
-                    }
                     setPreviewDoc({ filePath: doc.localPath, title: doc.title })
                   }
                 }}
@@ -825,18 +816,16 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             )}
           </div>
 
-          {/* Preview Panel Resizer */}
-          {previewDoc && (
-            <PanelResizer
-              direction="horizontal"
-              onResize={(delta) => setPreviewWidth(previewWidth - delta)}
-              onResizeEnd={saveLayout}
-            />
-          )}
+          {/* Document List Resizer */}
+          <PanelResizer
+            direction="horizontal"
+            onResize={(delta) => setDocumentListWidth(documentListWidth + delta)}
+            onResizeEnd={saveLayout}
+          />
 
-          {/* Right Preview Panel */}
-          {previewDoc && (
-            <div style={{ width: previewWidth }} className="flex-shrink-0 border-l border-border flex flex-col bg-bg-primary">
+          {/* Preview area - fills remaining space */}
+          {previewDoc ? (
+            <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
               <MarkdownPreview
                 filePath={previewDoc.filePath}
                 title={previewDoc.title}
@@ -853,6 +842,15 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                 }}
                 isPanel
               />
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center bg-bg-secondary">
+              <div className="text-center text-text-tertiary">
+                <svg className="w-16 h-16 mx-auto mb-4 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <p className="text-sm">选择文档预览</p>
+              </div>
             </div>
           )}
         </div>

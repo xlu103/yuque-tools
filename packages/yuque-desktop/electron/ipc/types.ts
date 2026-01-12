@@ -52,6 +52,18 @@ export interface SyncOptions {
   force?: boolean
 }
 
+export interface SingleDocSyncOptions {
+  bookId: string
+  docId: string
+  force?: boolean
+}
+
+export interface SingleDocSyncResult {
+  success: boolean
+  localPath?: string
+  error?: string
+}
+
 export interface SyncStatus {
   isRunning: boolean
   currentBookId?: string
@@ -87,6 +99,7 @@ export interface AppSettings {
   theme: 'system' | 'light' | 'dark'
   autoSyncInterval: 0 | 30 | 60 | 720 | 1440 // 0 = disabled, others in minutes
   autoSyncOnOpen: boolean // Auto sync when opening a knowledge base
+  documentListWidth: number // Document list panel width (300-800)
 }
 
 export interface SyncHistoryItem {
@@ -183,6 +196,7 @@ export interface IPCChannels {
 
   // Sync
   'sync:start': (options: SyncOptions) => Promise<SyncResult>
+  'sync:singleDoc': (options: SingleDocSyncOptions) => Promise<SingleDocSyncResult>
   'sync:cancel': () => Promise<void>
   'sync:getStatus': () => Promise<SyncStatus>
   'sync:getChanges': (bookIds: string[]) => Promise<ChangeSet>

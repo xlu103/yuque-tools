@@ -6,6 +6,7 @@ import { MacSwitch } from './ui/MacSwitch'
 import { MacToolbar, ToolbarTitle } from './ui/MacToolbar'
 import { useSyncStore } from '../stores/syncStore'
 import { useBooksStore } from '../stores/booksStore'
+import { usePanelLayoutStore, PANEL_CONSTRAINTS } from '../stores/panelLayoutStore'
 import { FailedDocsPanel } from './FailedDocsPanel'
 
 interface SettingsPanelProps {
@@ -21,6 +22,7 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
   const { listBooks, getAllNotesForSync } = useBooks()
   const { isRunning, setRunning, setProgress } = useSyncStore()
   const { books, setBooks } = useBooksStore()
+  const { documentListWidth, setDocumentListWidth, saveLayout } = usePanelLayoutStore()
   
   const [settings, setLocalSettings] = useState<AppSettings>({
     syncDirectory: '',
@@ -28,7 +30,8 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
     latexcode: false,
     theme: 'system',
     autoSyncInterval: 0,
-    autoSyncOnOpen: false
+    autoSyncOnOpen: false,
+    documentListWidth: 400
   })
   const [loading, setLoading] = useState(true)
   const [isForceSyncing, setIsForceSyncing] = useState(false)
@@ -304,17 +307,40 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
           {/* Theme */}
           <section>
             <h2 className="text-sm font-semibold text-text-primary mb-4">外观</h2>
-            <div>
-              <label className="block text-sm text-text-secondary mb-2">主题</label>
-              <select
-                value={settings.theme}
-                onChange={(e) => handleSettingChange('theme', e.target.value)}
-                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
-              >
-                <option value="system">跟随系统</option>
-                <option value="light">浅色</option>
-                <option value="dark">深色</option>
-              </select>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">主题</label>
+                <select
+                  value={settings.theme}
+                  onChange={(e) => handleSettingChange('theme', e.target.value)}
+                  className="w-full px-3 py-2 bg-bg-primary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  <option value="system">跟随系统</option>
+                  <option value="light">浅色</option>
+                  <option value="dark">深色</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">
+                  文档列表宽度: {documentListWidth}px
+                </label>
+                <input
+                  type="range"
+                  min={PANEL_CONSTRAINTS.documentList.min}
+                  max={PANEL_CONSTRAINTS.documentList.max}
+                  value={documentListWidth}
+                  onChange={(e) => {
+                    const width = parseInt(e.target.value, 10)
+                    setDocumentListWidth(width)
+                    saveLayout()
+                  }}
+                  className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer accent-accent"
+                />
+                <div className="flex justify-between text-xs text-text-tertiary mt-1">
+                  <span>{PANEL_CONSTRAINTS.documentList.min}px</span>
+                  <span>{PANEL_CONSTRAINTS.documentList.max}px</span>
+                </div>
+              </div>
             </div>
           </section>
 

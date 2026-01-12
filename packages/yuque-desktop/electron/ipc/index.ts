@@ -15,7 +15,9 @@ import type {
   SearchOptions,
   SearchResult,
   InterruptedSession,
-  SyncStatistics
+  SyncStatistics,
+  SingleDocSyncOptions,
+  SingleDocSyncResult
 } from './types'
 import {
   // Settings
@@ -24,7 +26,6 @@ import {
   // Books
   upsertBooks,
   getAllBooks,
-  updateBookDocCount,
   // Documents
   upsertDocuments,
   getDocumentsByBookId,
@@ -48,6 +49,7 @@ import {
 } from '../services/books'
 import {
   startSync,
+  syncSingleDocument,
   cancelSync,
   getSyncStatus,
   getChangesForBooks,
@@ -232,9 +234,9 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
           bookId: doc.bookId,
           slug: doc.slug,
           title: doc.title,
-          uuid: doc.uuid,
-          parentUuid: doc.parentUuid,
-          childUuid: doc.childUuid,
+          uuid: doc.uuid || undefined,
+          parentUuid: doc.parentUuid || undefined,
+          childUuid: doc.childUuid || undefined,
           docType: doc.docType,
           depth: doc.depth,
           sortOrder: doc.sortOrder,
@@ -410,6 +412,39 @@ export function registerIpcHandlers(ipcMain: IpcMain, mainWindow?: BrowserWindow
   ipcMain.handle('sync:cancel', async () => {
     console.log('sync:cancel called')
     cancelSync()
+  })
+
+  // Single document sync handler
+  ipcMain.handle('sync:singleDoc', async (_event, options: SingleDocSyncOptions): Promise<SingleDocSyncResult> => {
+    console.log('sync:singleDoc called with:', options)
+    
+    // Get book info
+    const books = getAllBooks()
+    const book = books.find(b => b.id === options.bookId)
+    
+    let bookInfo: { userLogin: string; slug: string; name: string }
+    
+    if (options.bookId === '__notes__') {
+      const session = await getCurrentSession()
+      if (!session) {
+        return { success: false, error: '未登录' }
+      }
+      bookInfo = {
+        userLogin: session.login,
+        slug: 'notes',
+        name: '小记'
+      }
+    } else if (book) {
+      bookInfo = {
+        userLogin: book.user_login,
+        slug: book.slug,
+        name: book.name
+      }
+    } else {
+      return { success: false, error: '知识库不存在' }
+    }
+    
+    return await syncSingleDocument(options.bookId, options.docId, bookInfo, options.force)
   })
 
   ipcMain.handle('sync:getStatus', async (): Promise<SyncStatus> => {

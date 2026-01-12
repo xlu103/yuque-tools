@@ -3,7 +3,8 @@ import { create } from 'zustand'
 // Panel width constraints
 export const PANEL_CONSTRAINTS = {
   sidebar: { min: 180, max: 400, default: 220 },
-  preview: { min: 300, max: 800, default: 500 }
+  preview: { min: 300, max: 800, default: 500 },
+  documentList: { min: 300, max: 800, default: 400 }
 }
 
 const STORAGE_KEY = 'yuque-panel-layout'
@@ -22,10 +23,14 @@ interface PanelLayoutState {
   sidebarWidth: number
   /** 右侧预览面板宽度 */
   previewWidth: number
+  /** 文档列表宽度 */
+  documentListWidth: number
   /** 设置侧边栏宽度 */
   setSidebarWidth: (width: number) => void
   /** 设置预览面板宽度 */
   setPreviewWidth: (width: number) => void
+  /** 设置文档列表宽度 */
+  setDocumentListWidth: (width: number) => void
   /** 从 localStorage 加载布局 */
   loadLayout: () => void
   /** 保存布局到 localStorage */
@@ -35,6 +40,7 @@ interface PanelLayoutState {
 export const usePanelLayoutStore = create<PanelLayoutState>((set, get) => ({
   sidebarWidth: PANEL_CONSTRAINTS.sidebar.default,
   previewWidth: PANEL_CONSTRAINTS.preview.default,
+  documentListWidth: PANEL_CONSTRAINTS.documentList.default,
 
   setSidebarWidth: (width: number) => {
     const clamped = clampWidth(
@@ -54,6 +60,15 @@ export const usePanelLayoutStore = create<PanelLayoutState>((set, get) => ({
     set({ previewWidth: clamped })
   },
 
+  setDocumentListWidth: (width: number) => {
+    const clamped = clampWidth(
+      width,
+      PANEL_CONSTRAINTS.documentList.min,
+      PANEL_CONSTRAINTS.documentList.max
+    )
+    set({ documentListWidth: clamped })
+  },
+
   loadLayout: () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
@@ -69,7 +84,12 @@ export const usePanelLayoutStore = create<PanelLayoutState>((set, get) => ({
           PANEL_CONSTRAINTS.preview.min,
           PANEL_CONSTRAINTS.preview.max
         )
-        set({ sidebarWidth, previewWidth })
+        const documentListWidth = clampWidth(
+          parsed.documentListWidth ?? PANEL_CONSTRAINTS.documentList.default,
+          PANEL_CONSTRAINTS.documentList.min,
+          PANEL_CONSTRAINTS.documentList.max
+        )
+        set({ sidebarWidth, previewWidth, documentListWidth })
       }
     } catch (error) {
       console.error('Failed to load panel layout:', error)
@@ -79,10 +99,10 @@ export const usePanelLayoutStore = create<PanelLayoutState>((set, get) => ({
 
   saveLayout: () => {
     try {
-      const { sidebarWidth, previewWidth } = get()
+      const { sidebarWidth, previewWidth, documentListWidth } = get()
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ sidebarWidth, previewWidth })
+        JSON.stringify({ sidebarWidth, previewWidth, documentListWidth })
       )
     } catch (error) {
       console.error('Failed to save panel layout:', error)

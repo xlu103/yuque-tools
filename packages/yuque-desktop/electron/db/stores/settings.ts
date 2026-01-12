@@ -63,7 +63,8 @@ export function getAppSettings(): AppSettings {
     latexcode: settings.latexcode === 'true',
     theme: (settings.theme as AppSettings['theme']) ?? 'system',
     autoSyncInterval: settings.autoSyncInterval ? parseInt(settings.autoSyncInterval, 10) as AppSettings['autoSyncInterval'] : 0,
-    autoSyncOnOpen: settings.autoSyncOnOpen === 'true'
+    autoSyncOnOpen: settings.autoSyncOnOpen === 'true',
+    documentListWidth: settings.documentListWidth ? parseInt(settings.documentListWidth, 10) : 400
   }
 }
 
@@ -106,6 +107,9 @@ export function saveAppSettings(settings: Partial<AppSettings>): void {
   }
   if (settings.autoSyncOnOpen !== undefined) {
     entries.push(['autoSyncOnOpen', String(settings.autoSyncOnOpen)])
+  }
+  if (settings.documentListWidth !== undefined) {
+    entries.push(['documentListWidth', String(settings.documentListWidth)])
   }
 
   if (entries.length > 0) {

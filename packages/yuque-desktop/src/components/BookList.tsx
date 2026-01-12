@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { KnowledgeBase } from '../hooks'
-import { useBookOrganizeStore, type BookGroup } from '../stores'
+import { useBookOrganizeStore } from '../stores'
 import { SidebarItem } from './ui/MacSidebar'
 
 interface BookListProps {

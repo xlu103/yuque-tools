@@ -252,9 +252,9 @@ export function MarkdownPreview({
             <MacButton variant="secondary" size="sm" onClick={loadContent} className="mt-3">重试</MacButton>
           </div>
         ) : useHtmlRender ? (
-          <article className="markdown-body p-6 max-w-4xl mx-auto prose prose-slate dark:prose-invert" dangerouslySetInnerHTML={{ __html: content }} />
+          <article className="markdown-body p-6 prose prose-slate dark:prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: content }} />
         ) : (
-          <article className="markdown-body p-6 max-w-4xl mx-auto prose prose-slate dark:prose-invert">
+          <article className="markdown-body p-6 prose prose-slate dark:prose-invert max-w-none">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw]}
