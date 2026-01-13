@@ -64,7 +64,8 @@ export function getAppSettings(): AppSettings {
     theme: (settings.theme as AppSettings['theme']) ?? 'system',
     autoSyncInterval: settings.autoSyncInterval ? parseInt(settings.autoSyncInterval, 10) as AppSettings['autoSyncInterval'] : 0,
     autoSyncOnOpen: settings.autoSyncOnOpen === 'true',
-    documentListWidth: settings.documentListWidth ? parseInt(settings.documentListWidth, 10) : 400
+    documentListWidth: settings.documentListWidth ? parseInt(settings.documentListWidth, 10) : 400,
+    hideFailedDocs: settings.hideFailedDocs === 'true'
   }
 }
 
@@ -110,6 +111,9 @@ export function saveAppSettings(settings: Partial<AppSettings>): void {
   }
   if (settings.documentListWidth !== undefined) {
     entries.push(['documentListWidth', String(settings.documentListWidth)])
+  }
+  if (settings.hideFailedDocs !== undefined) {
+    entries.push(['hideFailedDocs', String(settings.hideFailedDocs)])
   }
 
   if (entries.length > 0) {
