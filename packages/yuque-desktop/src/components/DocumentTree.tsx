@@ -203,8 +203,8 @@ function DocumentTreeNode({
         </div>
 
         {/* Document info */}
-        <div className="flex-1 min-w-0">
-          <h3 className={`text-sm font-medium text-text-primary truncate transition-colors ${isFolder ? 'font-semibold' : ''}`}>
+        <div className="flex-1 min-w-0 relative">
+          <h3 className={`text-sm font-medium text-text-primary truncate transition-colors pr-2 ${isFolder ? 'font-semibold' : ''}`}>
             {node.title}
           </h3>
           {!isFolder && node.localSyncedAt && (
@@ -218,58 +218,58 @@ function DocumentTreeNode({
               })}
             </div>
           )}
+          
+          {/* Action buttons - overlay on title */}
+          {!isFolder && (
+            <div className="absolute right-0 top-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-gradient-to-l from-bg-secondary via-bg-secondary to-transparent pl-4 pr-1">
+              {isSynced && onPreview && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onPreview(node)
+                  }}
+                  className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  title="预览"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                </button>
+              )}
+
+              {isSynced && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenFile(node)
+                  }}
+                  className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  title="打开文件"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </button>
+              )}
+
+              {bookInfo && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenInYuque(node)
+                  }}
+                  className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
+                  title="在语雀中打开"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          )}
         </div>
-
-        {/* Action buttons */}
-        {!isFolder && (
-          <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-            {isSynced && onPreview && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onPreview(node)
-                }}
-                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-                title="预览"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                </svg>
-              </button>
-            )}
-
-            {isSynced && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenFile(node)
-                }}
-                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-                title="打开文件"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </button>
-            )}
-
-            {bookInfo && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onOpenInYuque(node)
-                }}
-                className="p-1.5 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-                title="在语雀中打开"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                </svg>
-              </button>
-            )}
-          </div>
-        )}
 
         {/* Status badge - only show for documents, not folders */}
         {!isFolder && (
