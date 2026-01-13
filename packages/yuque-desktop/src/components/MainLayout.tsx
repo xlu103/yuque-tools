@@ -71,6 +71,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [showStats, setShowStats] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'tree'>('tree') // Default to tree view
+  const [hideFailedDocs, setHideFailedDocs] = useState(false)
   
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
@@ -118,6 +119,11 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   useEffect(() => {
     loadBooks()
     loadLayout() // Load saved panel layout
+    
+    // Load hideFailedDocs setting
+    getSettings().then(settings => {
+      setHideFailedDocs(settings.hideFailedDocs || false)
+    }).catch(console.error)
   }, [])
 
   // Auto sync setup
@@ -172,6 +178,9 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
         try {
           const settings = await getSettings()
           const newInterval = settings.autoSyncInterval || 0
+          
+          // Also update hideFailedDocs setting
+          setHideFailedDocs(settings.hideFailedDocs || false)
           
           if (newInterval !== autoSyncIntervalRef.current) {
             // Interval changed, clear and reset timer
@@ -782,6 +791,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                 emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
                 bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
                 bookId={selectedBookId || undefined}
+                hideFailedDocs={hideFailedDocs}
                 onPreview={(doc) => {
                   if (doc.localPath) {
                     setPreviewDoc({ filePath: doc.localPath, title: doc.title })

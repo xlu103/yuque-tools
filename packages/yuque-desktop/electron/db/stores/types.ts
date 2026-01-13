@@ -125,6 +125,7 @@ export interface AppSettings {
   autoSyncInterval: 0 | 30 | 60 | 720 | 1440 // 0 = disabled, others in minutes
   autoSyncOnOpen: boolean // Auto sync when opening a knowledge base
   documentListWidth: number // Document list panel width (300-800)
+  hideFailedDocs: boolean // Hide failed documents in the list
 }
 
 

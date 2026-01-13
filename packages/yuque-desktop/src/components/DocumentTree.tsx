@@ -15,6 +15,7 @@ interface DocumentTreeProps {
   bookId?: string
   onPreview?: (doc: Document) => void
   onDocumentSynced?: (doc: Document) => void
+  hideFailedDocs?: boolean
 }
 
 interface TreeNode extends Document {
@@ -327,7 +328,8 @@ export function DocumentTree({
   bookInfo,
   bookId,
   onPreview,
-  onDocumentSynced
+  onDocumentSynced,
+  hideFailedDocs = false
 }: DocumentTreeProps) {
   const isElectron = useIsElectron()
   const { syncSingleDoc } = useSync()
@@ -344,7 +346,13 @@ export function DocumentTree({
     saveCollapseState 
   } = useTreeCollapseStore()
 
-  const tree = useMemo(() => buildDocumentTree(documents), [documents])
+  // Filter out failed documents if hideFailedDocs is enabled
+  const filteredDocuments = useMemo(() => {
+    if (!hideFailedDocs) return documents
+    return documents.filter(doc => doc.syncStatus !== 'failed')
+  }, [documents, hideFailedDocs])
+
+  const tree = useMemo(() => buildDocumentTree(filteredDocuments), [filteredDocuments])
 
   const folderNodeIds = useMemo(() => {
     const ids: string[] = []

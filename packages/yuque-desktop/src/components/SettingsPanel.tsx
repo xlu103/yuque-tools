@@ -31,7 +31,8 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
     theme: 'system',
     autoSyncInterval: 0,
     autoSyncOnOpen: false,
-    documentListWidth: 400
+    documentListWidth: 400,
+    hideFailedDocs: false
   })
   const [loading, setLoading] = useState(true)
   const [isForceSyncing, setIsForceSyncing] = useState(false)
@@ -229,6 +230,12 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                 description="选择知识库后自动开始同步文档"
                 checked={settings.autoSyncOnOpen}
                 onChange={(checked) => handleSettingChange('autoSyncOnOpen', checked)}
+              />
+              <MacSwitch
+                label="隐藏同步失败的文档"
+                description="在文档列表中不显示同步失败的文档"
+                checked={settings.hideFailedDocs}
+                onChange={(checked) => handleSettingChange('hideFailedDocs', checked)}
               />
               <div>
                 <label className="block text-sm text-text-secondary mb-2">全局强制同步</label>
