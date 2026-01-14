@@ -24,15 +24,6 @@ interface TreeNode extends Document {
   level: number
 }
 
-const statusConfig = {
-  synced: { label: '已同步', color: 'text-success', bg: 'bg-success/10' },
-  pending: { label: '待同步', color: 'text-warning', bg: 'bg-warning/10' },
-  modified: { label: '已修改', color: 'text-info', bg: 'bg-info/10' },
-  new: { label: '新增', color: 'text-accent', bg: 'bg-accent/10' },
-  deleted: { label: '已删除', color: 'text-error', bg: 'bg-error/10' },
-  failed: { label: '同步失败', color: 'text-error', bg: 'bg-error/10' }
-}
-
 function buildDocumentTree(documents: Document[]): TreeNode[] {
   const nodesByUuid = new Map<string, TreeNode>()
   const nodesById = new Map<string, TreeNode>()
@@ -116,7 +107,6 @@ function DocumentTreeNode({
 }) {
   const hasChildren = node.children.length > 0
   const isSynced = node.syncStatus === 'synced' && node.localPath
-  const status = statusConfig[node.syncStatus]
   const isFolder = node.docType === 'TITLE' || hasChildren
   const { isCollapsed: checkCollapsed, toggleNode, saveCollapseState } = useTreeCollapseStore()
   const isSyncing = syncingDocId === node.id
@@ -179,7 +169,7 @@ function DocumentTreeNode({
           />
         )}
 
-        {/* Document icon with sync animation */}
+        {/* Document icon with sync animation and status color */}
         <div className="flex-shrink-0 mt-0.5 relative">
           {isSyncing ? (
             <div className="w-5 h-5 border-2 border-accent border-t-transparent rounded-full animate-spin" />
@@ -193,21 +183,38 @@ function DocumentTreeNode({
               />
             </svg>
           ) : (
-            <svg className="w-5 h-5 text-text-tertiary transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
-            </svg>
+            <>
+              <svg 
+                className={`w-5 h-5 transition-colors ${
+                  node.syncStatus === 'failed' ? 'text-error' : 
+                  node.syncStatus === 'synced' ? 'text-text-tertiary' : 
+                  'text-accent'
+                }`} 
+                fill="none" 
+                viewBox="0 0 24 24" 
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
+              </svg>
+              {/* Status indicator dot for non-synced documents */}
+              {node.syncStatus !== 'synced' && (
+                <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${
+                  node.syncStatus === 'failed' ? 'bg-error' : 'bg-accent'
+                }`} />
+              )}
+            </>
           )}
         </div>
 
         {/* Document info */}
-        <div className="flex-1 min-w-0 relative">
+        <div className="flex-1 min-w-0">
           <Tooltip content={node.title}>
-            <h3 className={`text-sm font-medium text-text-primary truncate transition-colors pr-2 ${isFolder ? 'font-semibold' : ''}`}>
+            <h3 className={`text-sm font-medium text-text-primary truncate transition-colors ${isFolder ? 'font-semibold' : ''}`}>
               {node.title}
             </h3>
           </Tooltip>
@@ -222,65 +229,7 @@ function DocumentTreeNode({
               })}
             </div>
           )}
-          
-          {/* Action buttons - overlay on title */}
-          {!isFolder && (
-            <div className="absolute right-0 top-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-gradient-to-l from-bg-secondary via-bg-secondary to-transparent pl-4 pr-1">
-              {isSynced && onPreview && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onPreview(node)
-                  }}
-                  className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-                  title="预览"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </svg>
-                </button>
-              )}
-
-              {isSynced && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenFile(node)
-                  }}
-                  className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-                  title="打开文件"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                </button>
-              )}
-
-              {bookInfo && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenInYuque(node)
-                  }}
-                  className="p-1 rounded hover:bg-bg-tertiary text-text-secondary hover:text-text-primary transition-colors"
-                  title="在语雀中打开"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          )}
         </div>
-
-        {/* Status badge - only show for documents, not folders */}
-        {!isFolder && (
-          <div className={`flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium transition-colors ${status.color} ${status.bg}`}>
-            {isSyncing ? '同步中...' : status.label}
-          </div>
-        )}
       </div>
 
       {/* Render children with animation */}
