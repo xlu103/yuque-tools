@@ -32,7 +32,8 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
     autoSyncInterval: 0,
     autoSyncOnOpen: false,
     documentListWidth: 400,
-    hideFailedDocs: false
+    hideFailedDocs: false,
+    previewFontSize: 16
   })
   const [loading, setLoading] = useState(true)
   const [isForceSyncing, setIsForceSyncing] = useState(false)
@@ -346,6 +347,23 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                 <div className="flex justify-between text-xs text-text-tertiary mt-1">
                   <span>{PANEL_CONSTRAINTS.documentList.min}px</span>
                   <span>{PANEL_CONSTRAINTS.documentList.max}px</span>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">
+                  预览字号: {settings.previewFontSize}px
+                </label>
+                <input
+                  type="range"
+                  min={12}
+                  max={24}
+                  value={settings.previewFontSize}
+                  onChange={(e) => handleSettingChange('previewFontSize', parseInt(e.target.value, 10))}
+                  className="w-full h-2 bg-bg-tertiary rounded-lg appearance-none cursor-pointer accent-accent"
+                />
+                <div className="flex justify-between text-xs text-text-tertiary mt-1">
+                  <span>12px</span>
+                  <span>24px</span>
                 </div>
               </div>
             </div>

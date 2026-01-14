@@ -65,7 +65,8 @@ export function getAppSettings(): AppSettings {
     autoSyncInterval: settings.autoSyncInterval ? parseInt(settings.autoSyncInterval, 10) as AppSettings['autoSyncInterval'] : 0,
     autoSyncOnOpen: settings.autoSyncOnOpen === 'true',
     documentListWidth: settings.documentListWidth ? parseInt(settings.documentListWidth, 10) : 400,
-    hideFailedDocs: settings.hideFailedDocs === 'true'
+    hideFailedDocs: settings.hideFailedDocs === 'true',
+    previewFontSize: settings.previewFontSize ? parseInt(settings.previewFontSize, 10) : 16
   }
 }
 
@@ -114,6 +115,9 @@ export function saveAppSettings(settings: Partial<AppSettings>): void {
   }
   if (settings.hideFailedDocs !== undefined) {
     entries.push(['hideFailedDocs', String(settings.hideFailedDocs)])
+  }
+  if (settings.previewFontSize !== undefined) {
+    entries.push(['previewFontSize', String(settings.previewFontSize)])
   }
 
   if (entries.length > 0) {

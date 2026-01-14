@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { useBooks, useSync, useSyncEvents, useToast, useIsElectron, useSettings, useSearch } from '../hooks'
 import type { Session, SyncProgress, SearchResult } from '../hooks'
-import { useBooksStore, useSyncStore, usePanelLayoutStore } from '../stores'
+import { useBooksStore, useSyncStore, usePanelLayoutStore, useReadingHistoryStore } from '../stores'
 import { MacSidebar, SidebarSection, SidebarItem } from './ui/MacSidebar'
 import { MacToolbar, ToolbarGroup, ToolbarDivider, ToolbarTitle } from './ui/MacToolbar'
 import { MacButton } from './ui/MacButton'
@@ -66,12 +66,17 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     saveLayout
   } = usePanelLayoutStore()
 
+  // Reading history
+  const { history: readingHistory, addToHistory, loadHistory } = useReadingHistoryStore()
+
   const [showSettings, setShowSettings] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'tree'>('tree') // Default to tree view
   const [hideFailedDocs, setHideFailedDocs] = useState(false)
+  const [previewFontSize, setPreviewFontSize] = useState(16)
+  const [syncReminder, setSyncReminder] = useState<string | null>(null)
   
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
@@ -115,15 +120,61 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     }
   }, [isElectron, isRunning, selectedBookId])
 
+  // Global keyboard shortcuts (Cmd/Ctrl + K for search, Escape to close preview)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isMod = e.metaKey || e.ctrlKey
+      
+      // Cmd/Ctrl + K: Focus search
+      if (isMod && e.key === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+      }
+      // Escape: Close preview or search results
+      if (e.key === 'Escape') {
+        if (showSearchResults) {
+          setShowSearchResults(false)
+        } else if (previewDoc) {
+          setPreviewDoc(null)
+        }
+      }
+      // Cmd/Ctrl + W: Close preview
+      if (isMod && e.key === 'w' && previewDoc) {
+        e.preventDefault()
+        setPreviewDoc(null)
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showSearchResults, previewDoc])
+
   // Load books and settings on mount
   useEffect(() => {
     loadBooks()
     loadLayout() // Load saved panel layout
+    loadHistory() // Load reading history
     
     // Load hideFailedDocs setting
     getSettings().then(settings => {
       setHideFailedDocs(settings.hideFailedDocs || false)
+      setPreviewFontSize(settings.previewFontSize || 16)
     }).catch(console.error)
+    
+    // Check last sync time for reminder (7 days threshold)
+    if (window.electronAPI) {
+      window.electronAPI['stats:get']().then(stats => {
+        if (stats.lastSyncTime) {
+          const lastSync = new Date(stats.lastSyncTime)
+          const daysSince = Math.floor((Date.now() - lastSync.getTime()) / (1000 * 60 * 60 * 24))
+          if (daysSince >= 7) {
+            setSyncReminder(`已有 ${daysSince} 天未同步`)
+          }
+        } else if (stats.totalDocuments > 0) {
+          setSyncReminder('尚未进行过同步')
+        }
+      }).catch(console.error)
+    }
   }, [])
 
   // Auto sync setup
@@ -181,6 +232,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
           
           // Also update hideFailedDocs setting
           setHideFailedDocs(settings.hideFailedDocs || false)
+          setPreviewFontSize(settings.previewFontSize || 16)
           
           if (newInterval !== autoSyncIntervalRef.current) {
             // Interval changed, clear and reset timer
@@ -344,8 +396,13 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     onComplete: (result) => {
       setRunning(false)
       setProgress(null)
+      setSyncReminder(null) // Clear reminder after sync
       if (result.success) {
-        showToast('success', `同步完成: ${result.syncedDocs} 个文档`)
+        // Show detailed sync report
+        const parts = []
+        if (result.syncedDocs > 0) parts.push(`${result.syncedDocs} 个文档已同步`)
+        if (result.failedDocs > 0) parts.push(`${result.failedDocs} 个失败`)
+        showToast('success', parts.length > 0 ? parts.join('，') : '同步完成，无更新')
         // Refresh current book documents
         if (selectedBookId) {
           loadDocuments(selectedBookId)
@@ -563,6 +620,20 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             </div>
           }
         >
+          {/* Reading History */}
+          {readingHistory.length > 0 && (
+            <SidebarSection title="最近阅读">
+              {readingHistory.slice(0, 5).map((item, i) => (
+                <SidebarItem
+                  key={i}
+                  icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+                  label={item.title}
+                  onClick={() => setPreviewDoc({ filePath: item.filePath, title: item.title })}
+                />
+              ))}
+            </SidebarSection>
+          )}
+          
           {/* Book list */}
           <SidebarSection title="知识库">
             <BookList
@@ -728,10 +799,15 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
               </MacButton>
             ) : (
               <>
+                {syncReminder && (
+                  <span className="text-xs text-warning bg-warning/10 px-2 py-1 rounded mr-2">
+                    ⚠️ {syncReminder}
+                  </span>
+                )}
                 <MacButton 
                   variant="primary" 
                   size="sm" 
-                  onClick={() => handleSync(false)}
+                  onClick={() => { handleSync(false); setSyncReminder(null) }}
                   disabled={!selectedBookId}
                   title="同步当前知识库"
                 >
@@ -740,7 +816,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                 <MacButton 
                   variant="secondary" 
                   size="sm" 
-                  onClick={() => handleGlobalSync(false)}
+                  onClick={() => { handleGlobalSync(false); setSyncReminder(null) }}
                   disabled={books.length === 0}
                   title="同步所有知识库"
                 >
@@ -795,6 +871,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                 onPreview={(doc) => {
                   if (doc.localPath) {
                     setPreviewDoc({ filePath: doc.localPath, title: doc.title })
+                    addToHistory({ filePath: doc.localPath, title: doc.title, bookId: selectedBookId || undefined, bookName: selectedBook?.name })
                   }
                 }}
                 onDocumentSynced={(doc) => {
@@ -820,6 +897,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                 onPreview={(doc) => {
                   if (doc.localPath) {
                     setPreviewDoc({ filePath: doc.localPath, title: doc.title })
+                    addToHistory({ filePath: doc.localPath, title: doc.title, bookId: selectedBookId || undefined, bookName: selectedBook?.name })
                   }
                 }}
               />
@@ -851,6 +929,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                   }
                 }}
                 isPanel
+                fontSize={previewFontSize}
               />
             </div>
           ) : (

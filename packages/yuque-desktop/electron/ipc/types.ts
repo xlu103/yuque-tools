@@ -101,6 +101,7 @@ export interface AppSettings {
   autoSyncOnOpen: boolean // Auto sync when opening a knowledge base
   documentListWidth: number // Document list panel width (300-800)
   hideFailedDocs: boolean // Hide failed documents in the list
+  previewFontSize: number // Preview font size (12-24)
 }
 
 export interface SyncHistoryItem {
