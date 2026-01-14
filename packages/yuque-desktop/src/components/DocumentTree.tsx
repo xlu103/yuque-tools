@@ -3,6 +3,7 @@ import type { Document } from '../hooks'
 import { useIsElectron, useSync, useToast } from '../hooks'
 import { useTreeCollapseStore } from '../stores'
 import { ContextMenu, useContextMenu, type ContextMenuItem } from './ui/ContextMenu'
+import { Tooltip } from './ui/Tooltip'
 
 interface DocumentTreeProps {
   documents: Document[]
@@ -205,9 +206,11 @@ function DocumentTreeNode({
 
         {/* Document info */}
         <div className="flex-1 min-w-0 relative">
-          <h3 className={`text-sm font-medium text-text-primary truncate transition-colors pr-2 ${isFolder ? 'font-semibold' : ''}`}>
-            {node.title}
-          </h3>
+          <Tooltip content={node.title}>
+            <h3 className={`text-sm font-medium text-text-primary truncate transition-colors pr-2 ${isFolder ? 'font-semibold' : ''}`}>
+              {node.title}
+            </h3>
+          </Tooltip>
           {!isFolder && node.localSyncedAt && (
             <div className="mt-0.5 text-xs text-text-secondary">
               同步于{' '}

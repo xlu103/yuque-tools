@@ -1,4 +1,5 @@
 import { ReactNode } from 'react'
+import { Tooltip } from './Tooltip'
 
 interface MacSidebarProps {
   children: ReactNode
@@ -74,36 +75,38 @@ export function SidebarItem({
   className = '' 
 }: SidebarItemProps) {
   return (
-    <button
-      onClick={onClick}
-      className={`
-        w-full flex items-center gap-2 px-2 py-1.5 rounded-md
-        text-sm text-left
-        transition-colors duration-150 ease-mac
-        ${selected 
-          ? 'bg-accent text-white' 
-          : 'text-text-primary hover:bg-bg-tertiary'
-        }
-        ${className}
-      `}
-    >
-      {icon && (
-        <span className={`flex-shrink-0 ${selected ? 'text-white' : 'text-text-secondary'}`}>
-          {icon}
-        </span>
-      )}
-      <span className="flex-1 truncate">{label}</span>
-      {badge !== undefined && (
-        <span className={`
-          flex-shrink-0 px-1.5 py-0.5 text-xs rounded-full
+    <Tooltip content={label}>
+      <button
+        onClick={onClick}
+        className={`
+          w-full flex items-center gap-2 px-2 py-1.5 rounded-md
+          text-sm text-left
+          transition-colors duration-150 ease-mac
           ${selected 
-            ? 'bg-white/20 text-white' 
-            : 'bg-bg-tertiary text-text-secondary'
+            ? 'bg-accent text-white' 
+            : 'text-text-primary hover:bg-bg-tertiary'
           }
-        `}>
-          {badge}
-        </span>
-      )}
-    </button>
+          ${className}
+        `}
+      >
+        {icon && (
+          <span className={`flex-shrink-0 ${selected ? 'text-white' : 'text-text-secondary'}`}>
+            {icon}
+          </span>
+        )}
+        <span className="flex-1 truncate">{label}</span>
+        {badge !== undefined && (
+          <span className={`
+            flex-shrink-0 px-1.5 py-0.5 text-xs rounded-full
+            ${selected 
+              ? 'bg-white/20 text-white' 
+              : 'bg-bg-tertiary text-text-secondary'
+            }
+          `}>
+            {badge}
+          </span>
+        )}
+      </button>
+    </Tooltip>
   )
 }

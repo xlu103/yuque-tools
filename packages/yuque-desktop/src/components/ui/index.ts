@@ -3,6 +3,7 @@ export { MacButton } from './MacButton'
 export { MacInput } from './MacInput'
 export { MacSwitch } from './MacSwitch'
 export { MacProgress } from './MacProgress'
+export { Tooltip } from './Tooltip'
 
 // Layout Components
 export { MacSidebar } from './MacSidebar'
