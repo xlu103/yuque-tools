@@ -8,11 +8,8 @@ import { MacButton } from './ui/MacButton'
 import { MacProgress } from './ui/MacProgress'
 import { PanelResizer } from './ui/PanelResizer'
 import { BookList } from './BookList'
-import { DocumentList } from './DocumentList'
 import { DocumentTree } from './DocumentTree'
 import { SettingsPanel } from './SettingsPanel'
-import { SyncHistoryPanel } from './SyncHistoryPanel'
-import { StatisticsPanel } from './StatisticsPanel'
 import { MarkdownPreview } from './MarkdownPreview'
 
 // Notes book ID constant
@@ -31,7 +28,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const isElectron = useIsElectron()
-  const { listBooks, getBookDocs, getLocalDocs, loadMoreNotes, getAllNotesForSync } = useBooks()
+  const { listBooks, getBookDocs, getLocalDocs, getAllNotesForSync } = useBooks()
   const { startSync, cancelSync } = useSync()
   const { getSettings } = useSettings()
   const { showToast } = useToast()
@@ -70,10 +67,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const { history: readingHistory, addToHistory, loadHistory } = useReadingHistoryStore()
 
   const [showSettings, setShowSettings] = useState(false)
-  const [showHistory, setShowHistory] = useState(false)
-  const [showStats, setShowStats] = useState(false)
-  const [statusFilter, setStatusFilter] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'list' | 'tree'>('tree') // Default to tree view
   const [hideFailedDocs, setHideFailedDocs] = useState(false)
   const [previewFontSize, setPreviewFontSize] = useState(16)
   const [syncReminder, setSyncReminder] = useState<string | null>(null)
@@ -87,10 +80,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [isSearching, setIsSearching] = useState(false)
   const [showSearchResults, setShowSearchResults] = useState(false)
   const searchInputRef = useRef<HTMLInputElement>(null)
-  
-  // Notes lazy loading state
-  const [notesHasMore, setNotesHasMore] = useState(true)
-  const [notesLoading, setNotesLoading] = useState(false)
   
   // Network loading state (for background fetch indicator)
   const [isFetchingRemote, setIsFetchingRemote] = useState(false)
@@ -315,11 +304,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       setDocuments(bookId, docs)
       console.log(`[loadDocuments] Fetched ${docs.length} documents from network`)
       
-      // Reset notes lazy loading state when switching to notes book
-      if (bookId === NOTES_BOOK_ID) {
-        setNotesHasMore(true)
-      }
-      
       // Auto sync files to local if enabled - read directly from settings to ensure latest value
       const settings = await getSettings()
       
@@ -348,8 +332,8 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
         onLogout()
       } else {
         // Only show error if we don't have local data
-        const currentDocs = getDocumentsForBook(bookId)
-        if (currentDocs.length === 0) {
+        const docs = getDocumentsForBook(bookId)
+        if (docs.length === 0) {
           showToast('error', '获取文档列表失败')
         } else {
           showToast('warning', '网络获取失败，显示本地缓存')
@@ -360,33 +344,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       setIsFetchingRemote(false)
     }
   }, [getLocalDocs, getBookDocs, setDocuments, showToast, onLogout, isRunning, getSettings, startSync, setRunning, getDocumentsForBook])
-
-  // Load more notes (lazy loading)
-  const handleLoadMoreNotes = useCallback(async () => {
-    if (selectedBookId !== NOTES_BOOK_ID || notesLoading || !notesHasMore) {
-      return
-    }
-    
-    const currentDocs = getDocumentsForBook(NOTES_BOOK_ID)
-    const offset = currentDocs.length
-    
-    setNotesLoading(true)
-    try {
-      const result = await loadMoreNotes(offset, 20)
-      
-      // Append new notes to existing ones
-      const newDocs = [...currentDocs, ...result.notes]
-      setDocuments(NOTES_BOOK_ID, newDocs)
-      setNotesHasMore(result.hasMore)
-      
-      console.log(`Loaded ${result.notes.length} more notes, hasMore: ${result.hasMore}`)
-    } catch (error) {
-      console.error('Failed to load more notes:', error)
-      showToast('error', '加载更多小记失败')
-    } finally {
-      setNotesLoading(false)
-    }
-  }, [selectedBookId, notesLoading, notesHasMore, getDocumentsForBook, loadMoreNotes, setDocuments, showToast])
 
   // Handle sync events
   useSyncEvents({
@@ -539,27 +496,8 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const currentDocs = selectedBookId ? getDocumentsForBook(selectedBookId) : []
   const selectedBook = books.find(b => b.id === selectedBookId)
 
-  // Filter documents by status
-  const filteredDocs = statusFilter 
-    ? currentDocs.filter(d => d.syncStatus === statusFilter)
-    : currentDocs
-
-  // Count documents by status
-  const statusCounts = currentDocs.reduce((acc, doc) => {
-    acc[doc.syncStatus] = (acc[doc.syncStatus] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
-
-  if (showStats) {
-    return <StatisticsPanel onClose={() => setShowStats(false)} />
-  }
-
   if (showSettings) {
     return <SettingsPanel onClose={() => setShowSettings(false)} onLogout={onLogout} />
-  }
-
-  if (showHistory) {
-    return <SyncHistoryPanel onClose={() => setShowHistory(false)} />
   }
 
   return (
@@ -580,24 +518,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
           }
           bottomContent={
             <div className="space-y-1">
-              <SidebarItem
-                icon={
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                }
-                label="统计"
-                onClick={() => setShowStats(true)}
-              />
-              <SidebarItem
-                icon={
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                }
-                label="同步历史"
-                onClick={() => setShowHistory(true)}
-              />
               <SidebarItem
                 icon={
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -730,56 +650,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
               </span>
             )}
           </ToolbarGroup>
-          
-          <ToolbarDivider />
-          
-          {/* Status filter */}
-          <ToolbarGroup>
-            <select
-              value={statusFilter || ''}
-              onChange={(e) => setStatusFilter(e.target.value || null)}
-              className="text-xs bg-bg-secondary border border-border rounded px-2 py-1 text-text-primary"
-            >
-              <option value="">全部状态</option>
-              <option value="new">新增 ({statusCounts.new || 0})</option>
-              <option value="modified">已修改 ({statusCounts.modified || 0})</option>
-              <option value="synced">已同步 ({statusCounts.synced || 0})</option>
-              <option value="deleted">已删除 ({statusCounts.deleted || 0})</option>
-              <option value="failed">同步失败 ({statusCounts.failed || 0})</option>
-            </select>
-          </ToolbarGroup>
-          
-          <ToolbarDivider />
-          
-          {/* View mode toggle */}
-          <ToolbarGroup>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-1.5 rounded transition-colors ${
-                viewMode === 'list' 
-                  ? 'bg-accent/10 text-accent' 
-                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-secondary'
-              }`}
-              title="列表视图"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setViewMode('tree')}
-              className={`p-1.5 rounded transition-colors ${
-                viewMode === 'tree' 
-                  ? 'bg-accent/10 text-accent' 
-                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-secondary'
-              }`}
-              title="树形视图"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-              </svg>
-            </button>
-          </ToolbarGroup>
 
           <div className="flex-1" />
 
@@ -791,47 +661,58 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             </div>
           )}
 
-          {/* Sync controls */}
+          {/* Sync controls - dropdown menu */}
           <ToolbarGroup>
             {isRunning ? (
               <MacButton variant="secondary" size="sm" onClick={handleCancelSync}>
-                取消
+                取消同步
               </MacButton>
             ) : (
-              <>
+              <div className="relative group">
                 {syncReminder && (
-                  <span className="text-xs text-warning bg-warning/10 px-2 py-1 rounded mr-2">
-                    ⚠️ {syncReminder}
-                  </span>
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-warning rounded-full" />
                 )}
                 <MacButton 
                   variant="primary" 
                   size="sm" 
                   onClick={() => { handleSync(false); setSyncReminder(null) }}
-                  disabled={!selectedBookId}
-                  title="同步当前知识库"
+                  disabled={!selectedBookId && books.length === 0}
+                  title={syncReminder || '同步'}
+                  className="pr-1"
                 >
                   同步
+                  <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
                 </MacButton>
-                <MacButton 
-                  variant="secondary" 
-                  size="sm" 
-                  onClick={() => { handleGlobalSync(false); setSyncReminder(null) }}
-                  disabled={books.length === 0}
-                  title="同步所有知识库"
-                >
-                  全局同步
-                </MacButton>
-                <MacButton 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => handleSync(true)}
-                  disabled={!selectedBookId}
-                  title="强制重新下载当前知识库所有文档"
-                >
-                  强制同步
-                </MacButton>
-              </>
+                {/* Dropdown menu */}
+                <div className="absolute right-0 top-full mt-1 w-44 bg-bg-primary border border-border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                  <div className="py-1">
+                    <button
+                      onClick={() => { handleSync(false); setSyncReminder(null) }}
+                      disabled={!selectedBookId}
+                      className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      同步当前知识库
+                    </button>
+                    <button
+                      onClick={() => { handleGlobalSync(false); setSyncReminder(null) }}
+                      disabled={books.length === 0}
+                      className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      同步所有知识库
+                    </button>
+                    <div className="border-t border-border-light my-1" />
+                    <button
+                      onClick={() => handleSync(true)}
+                      disabled={!selectedBookId}
+                      className="w-full px-3 py-2 text-left text-sm text-text-secondary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      强制同步 (覆盖本地)
+                    </button>
+                  </div>
+                </div>
+              </div>
             )}
           </ToolbarGroup>
         </MacToolbar>
@@ -860,48 +741,30 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             style={{ width: documentListWidth }} 
             className="flex-shrink-0 overflow-auto border-r border-border-light transition-all duration-200"
           >
-            {viewMode === 'tree' ? (
-              <DocumentTree
-                documents={filteredDocs}
-                loading={isLoadingDocs}
-                emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
-                bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
-                bookId={selectedBookId || undefined}
-                hideFailedDocs={hideFailedDocs}
-                onPreview={(doc) => {
-                  if (doc.localPath) {
-                    setPreviewDoc({ filePath: doc.localPath, title: doc.title })
-                    addToHistory({ filePath: doc.localPath, title: doc.title, bookId: selectedBookId || undefined, bookName: selectedBook?.name })
-                  }
-                }}
-                onDocumentSynced={(doc) => {
-                  // Update document in store after single doc sync
-                  if (selectedBookId) {
-                    const currentDocs = getDocumentsForBook(selectedBookId)
-                    const updatedDocs = currentDocs.map(d => 
-                      d.id === doc.id ? { ...d, ...doc } : d
-                    )
-                    setDocuments(selectedBookId, updatedDocs)
-                  }
-                }}
-              />
-            ) : (
-              <DocumentList
-                documents={filteredDocs}
-                loading={isLoadingDocs}
-                emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
-                onLoadMore={selectedBookId === NOTES_BOOK_ID ? handleLoadMoreNotes : undefined}
-                hasMore={selectedBookId === NOTES_BOOK_ID ? notesHasMore : false}
-                loadingMore={notesLoading}
-                bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
-                onPreview={(doc) => {
-                  if (doc.localPath) {
-                    setPreviewDoc({ filePath: doc.localPath, title: doc.title })
-                    addToHistory({ filePath: doc.localPath, title: doc.title, bookId: selectedBookId || undefined, bookName: selectedBook?.name })
-                  }
-                }}
-              />
-            )}
+            <DocumentTree
+              documents={currentDocs}
+              loading={isLoadingDocs}
+              emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
+              bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
+              bookId={selectedBookId || undefined}
+              hideFailedDocs={hideFailedDocs}
+              onPreview={(doc) => {
+                if (doc.localPath) {
+                  setPreviewDoc({ filePath: doc.localPath, title: doc.title })
+                  addToHistory({ filePath: doc.localPath, title: doc.title, bookId: selectedBookId || undefined, bookName: selectedBook?.name })
+                }
+              }}
+              onDocumentSynced={(doc) => {
+                // Update document in store after single doc sync
+                if (selectedBookId) {
+                  const docs = getDocumentsForBook(selectedBookId)
+                  const updatedDocs = docs.map(d => 
+                    d.id === doc.id ? { ...d, ...doc } : d
+                  )
+                  setDocuments(selectedBookId, updatedDocs)
+                }
+              }}
+            />
           </div>
 
           {/* Document List Resizer */}

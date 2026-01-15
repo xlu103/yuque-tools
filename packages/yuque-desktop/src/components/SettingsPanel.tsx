@@ -8,6 +8,8 @@ import { useSyncStore } from '../stores/syncStore'
 import { useBooksStore } from '../stores/booksStore'
 import { usePanelLayoutStore, PANEL_CONSTRAINTS } from '../stores/panelLayoutStore'
 import { FailedDocsPanel } from './FailedDocsPanel'
+import { StatisticsPanel } from './StatisticsPanel'
+import { SyncHistoryPanel } from './SyncHistoryPanel'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -39,6 +41,8 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
   const [isForceSyncing, setIsForceSyncing] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [showFailedDocs, setShowFailedDocs] = useState(false)
+  const [showStats, setShowStats] = useState(false)
+  const [showHistory, setShowHistory] = useState(false)
 
   // Load settings
   useEffect(() => {
@@ -176,6 +180,14 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
     return <FailedDocsPanel onClose={() => setShowFailedDocs(false)} />
   }
 
+  if (showStats) {
+    return <StatisticsPanel onClose={() => setShowStats(false)} />
+  }
+
+  if (showHistory) {
+    return <SyncHistoryPanel onClose={() => setShowHistory(false)} />
+  }
+
   return (
     <div className="h-screen w-screen flex flex-col bg-bg-primary">
       {/* Toolbar - add left padding for macOS traffic lights */}
@@ -268,6 +280,26 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                 </MacButton>
                 <p className="mt-1 text-xs text-text-tertiary">
                   管理同步失败的文档，可重试或忽略
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">同步统计</label>
+                <div className="flex gap-2">
+                  <MacButton 
+                    variant="secondary" 
+                    onClick={() => setShowStats(true)}
+                  >
+                    查看统计
+                  </MacButton>
+                  <MacButton 
+                    variant="secondary" 
+                    onClick={() => setShowHistory(true)}
+                  >
+                    同步历史
+                  </MacButton>
+                </div>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  查看同步统计数据和历史记录
                 </p>
               </div>
               <div>
