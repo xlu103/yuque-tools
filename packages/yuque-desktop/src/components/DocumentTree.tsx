@@ -213,22 +213,21 @@ function DocumentTreeNode({
 
         {/* Document info */}
         <div className="flex-1 min-w-0">
-          <Tooltip content={node.title}>
+          <Tooltip content={
+            node.localSyncedAt 
+              ? `${node.title}\n同步于 ${new Date(node.localSyncedAt).toLocaleString('zh-CN', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}`
+              : node.title
+          }>
             <h3 className={`text-sm font-medium text-text-primary truncate transition-colors ${isFolder ? 'font-semibold' : ''}`}>
               {node.title}
             </h3>
           </Tooltip>
-          {!isFolder && node.localSyncedAt && (
-            <div className="mt-0.5 text-xs text-text-secondary">
-              同步于{' '}
-              {new Date(node.localSyncedAt).toLocaleString('zh-CN', {
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </div>
-          )}
         </div>
       </div>
 
@@ -292,8 +291,6 @@ export function DocumentTree({
   const { 
     isCollapsed, 
     toggleNode, 
-    collapseAll, 
-    expandAll, 
     loadCollapseState, 
     saveCollapseState 
   } = useTreeCollapseStore()
@@ -306,39 +303,11 @@ export function DocumentTree({
 
   const tree = useMemo(() => buildDocumentTree(filteredDocuments), [filteredDocuments])
 
-  const folderNodeIds = useMemo(() => {
-    const ids: string[] = []
-    const collectFolderIds = (nodes: TreeNode[]) => {
-      nodes.forEach(node => {
-        if (node.children.length > 0) {
-          ids.push(node.id)
-          collectFolderIds(node.children)
-        }
-      })
-    }
-    collectFolderIds(tree)
-    return ids
-  }, [tree])
-
   useEffect(() => {
     if (bookId) {
       loadCollapseState(bookId)
     }
   }, [bookId, loadCollapseState])
-
-  const handleCollapseAll = useCallback(() => {
-    if (bookId) {
-      collapseAll(bookId, folderNodeIds)
-      saveCollapseState(bookId)
-    }
-  }, [bookId, folderNodeIds, collapseAll, saveCollapseState])
-
-  const handleExpandAll = useCallback(() => {
-    if (bookId) {
-      expandAll(bookId)
-      saveCollapseState(bookId)
-    }
-  }, [bookId, expandAll, saveCollapseState])
 
   // Sync single document
   const handleSyncDocument = useCallback(async (doc: Document, force: boolean = false, autoPreview: boolean = true) => {
@@ -540,32 +509,6 @@ export function DocumentTree({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Collapse/Expand toolbar */}
-      {folderNodeIds.length > 0 && (
-        <div className="px-4 py-2 border-b border-border-light bg-bg-secondary flex items-center gap-2">
-          <button
-            onClick={handleCollapseAll}
-            className="px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors flex items-center gap-1"
-            title="全部折叠"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-            </svg>
-            <span>全部折叠</span>
-          </button>
-          <button
-            onClick={handleExpandAll}
-            className="px-2 py-1 text-xs text-text-secondary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors flex items-center gap-1"
-            title="全部展开"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <span>全部展开</span>
-          </button>
-        </div>
-      )}
-
       {/* Select all header */}
       {selectable && documents.length > 0 && (
         <div className="px-4 py-2 border-b border-border-light bg-bg-secondary flex items-center gap-3">

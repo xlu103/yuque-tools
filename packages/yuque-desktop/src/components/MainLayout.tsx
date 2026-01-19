@@ -70,6 +70,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [hideFailedDocs, setHideFailedDocs] = useState(false)
   const [previewFontSize, setPreviewFontSize] = useState(16)
   const [syncReminder, setSyncReminder] = useState<string | null>(null)
+  const [showSyncMenu, setShowSyncMenu] = useState(false)
   
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
@@ -480,12 +481,15 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     setSearchQuery('')
   }, [setSelectedBookId])
 
-  // Close search results when clicking outside
+  // Close search results and sync menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (!target.closest('.search-container')) {
         setShowSearchResults(false)
+      }
+      if (!target.closest('.sync-menu-container')) {
+        setShowSyncMenu(false)
       }
     }
     document.addEventListener('click', handleClickOutside)
@@ -517,26 +521,26 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             </div>
           }
           bottomContent={
-            <div className="space-y-1">
-              <SidebarItem
-                icon={
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                }
-                label="刷新"
+            <div className="flex items-center gap-1">
+              <button
                 onClick={loadBooks}
-              />
-              <SidebarItem
-                icon={
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                }
-                label="设置"
+                className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+                title="刷新知识库"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <button
                 onClick={() => setShowSettings(true)}
-              />
+                className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+                title="设置"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
             </div>
           }
         >
@@ -668,50 +672,52 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                 取消同步
               </MacButton>
             ) : (
-              <div className="relative group">
+              <div className="relative sync-menu-container">
                 {syncReminder && (
-                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-warning rounded-full" />
+                  <span className="absolute -top-1 -right-1 w-2 h-2 bg-warning rounded-full z-10" />
                 )}
                 <MacButton 
                   variant="primary" 
                   size="sm" 
-                  onClick={() => { handleSync(false); setSyncReminder(null) }}
+                  onClick={() => setShowSyncMenu(!showSyncMenu)}
                   disabled={!selectedBookId && books.length === 0}
                   title={syncReminder || '同步'}
                   className="pr-1"
                 >
                   同步
-                  <svg className="w-3 h-3 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg className={`w-3 h-3 ml-1 transition-transform ${showSyncMenu ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </MacButton>
                 {/* Dropdown menu */}
-                <div className="absolute right-0 top-full mt-1 w-44 bg-bg-primary border border-border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
-                  <div className="py-1">
-                    <button
-                      onClick={() => { handleSync(false); setSyncReminder(null) }}
-                      disabled={!selectedBookId}
-                      className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      同步当前知识库
-                    </button>
-                    <button
-                      onClick={() => { handleGlobalSync(false); setSyncReminder(null) }}
-                      disabled={books.length === 0}
-                      className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      同步所有知识库
-                    </button>
-                    <div className="border-t border-border-light my-1" />
-                    <button
-                      onClick={() => handleSync(true)}
-                      disabled={!selectedBookId}
-                      className="w-full px-3 py-2 text-left text-sm text-text-secondary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      强制同步 (覆盖本地)
-                    </button>
+                {showSyncMenu && (
+                  <div className="absolute right-0 top-full mt-1 w-44 bg-bg-primary border border-border rounded-lg shadow-lg z-50 animate-fade-in">
+                    <div className="py-1">
+                      <button
+                        onClick={() => { handleSync(false); setSyncReminder(null); setShowSyncMenu(false) }}
+                        disabled={!selectedBookId}
+                        className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        同步当前知识库
+                      </button>
+                      <button
+                        onClick={() => { handleGlobalSync(false); setSyncReminder(null); setShowSyncMenu(false) }}
+                        disabled={books.length === 0}
+                        className="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        同步所有知识库
+                      </button>
+                      <div className="border-t border-border-light my-1" />
+                      <button
+                        onClick={() => { handleSync(true); setShowSyncMenu(false) }}
+                        disabled={!selectedBookId}
+                        className="w-full px-3 py-2 text-left text-sm text-text-secondary hover:bg-bg-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        强制同步 (覆盖本地)
+                      </button>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             )}
           </ToolbarGroup>
@@ -797,11 +803,55 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             </div>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-bg-secondary">
-              <div className="text-center text-text-tertiary">
-                <svg className="w-16 h-16 mx-auto mb-4 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="max-w-md text-center px-6">
+                {/* Icon */}
+                <svg className="w-20 h-20 mx-auto mb-6 text-text-quaternary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
-                <p className="text-sm">选择文档预览</p>
+                
+                {/* Main message */}
+                <h3 className="text-lg font-medium text-text-primary mb-2">选择文档开始预览</h3>
+                <p className="text-sm text-text-secondary mb-6">从左侧文档列表中选择一个文档，或使用快捷键快速操作</p>
+                
+                {/* Quick actions */}
+                <div className="space-y-3 text-left bg-bg-primary rounded-lg p-4 border border-border-light">
+                  <div className="flex items-center gap-3 text-sm">
+                    <kbd className="px-2 py-1 bg-bg-tertiary rounded text-xs font-mono border border-border">⌘K</kbd>
+                    <span className="text-text-secondary">搜索文档</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <kbd className="px-2 py-1 bg-bg-tertiary rounded text-xs font-mono border border-border">⌘W</kbd>
+                    <span className="text-text-secondary">关闭预览</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <kbd className="px-2 py-1 bg-bg-tertiary rounded text-xs font-mono border border-border">ESC</kbd>
+                    <span className="text-text-secondary">退出搜索/预览</span>
+                  </div>
+                </div>
+                
+                {/* Recent reading */}
+                {readingHistory.length > 0 && (
+                  <div className="mt-6">
+                    <h4 className="text-xs font-medium text-text-tertiary mb-3 text-left">最近阅读</h4>
+                    <div className="space-y-2">
+                      {readingHistory.slice(0, 3).map((item, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setPreviewDoc({ filePath: item.filePath, title: item.title })}
+                          className="w-full flex items-center gap-3 px-3 py-2 text-left bg-bg-primary hover:bg-bg-tertiary rounded-lg border border-border-light transition-colors group"
+                        >
+                          <svg className="w-4 h-4 text-text-tertiary group-hover:text-accent flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          <span className="text-sm text-text-primary truncate flex-1">{item.title}</span>
+                          <svg className="w-4 h-4 text-text-quaternary group-hover:text-text-secondary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
