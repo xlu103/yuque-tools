@@ -152,17 +152,17 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
 
   return (
     <div
-      className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-start justify-center pt-20"
+      className="fixed inset-0 bg-black/30 backdrop-blur-sm z-50 flex items-start justify-center pt-16 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-bg-primary border border-border rounded-xl shadow-2xl w-[600px] max-w-[90vw] max-h-[70vh] overflow-hidden flex flex-col"
+        className="bg-bg-primary border border-border rounded-2xl shadow-2xl w-[640px] max-w-[90vw] max-h-[75vh] overflow-hidden flex flex-col animate-slide-in-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Input */}
-        <div className="p-4 border-b border-border">
+        <div className="p-5 border-b border-border">
           <div className="relative">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -171,54 +171,54 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="搜索知识库和文档..."
-              className="w-full pl-10 pr-10 py-2.5 text-sm bg-bg-secondary border border-border rounded-lg text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent"
+              className="w-full pl-12 pr-20 py-3 text-base bg-bg-secondary border border-border rounded-xl text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-all"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary transition-colors"
+                className="absolute right-14 top-1/2 -translate-y-1/2 p-1 text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary rounded transition-colors"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             )}
-            <div className="absolute right-10 top-1/2 -translate-y-1/2 text-xs text-text-quaternary">
+            <div className="absolute right-4 top-1/2 -translate-y-1/2 px-2 py-1 bg-bg-tertiary rounded text-xs text-text-quaternary font-mono border border-border">
               ⌘K
             </div>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="px-4 py-3 border-b border-border flex items-center gap-3">
+        <div className="px-5 py-3 border-b border-border flex items-center gap-3 bg-bg-secondary/50">
           {/* Scope tabs */}
-          <div className="flex items-center gap-1 bg-bg-secondary rounded-md p-0.5">
+          <div className="flex items-center gap-1 bg-bg-primary rounded-lg p-1 border border-border">
             <button
               onClick={() => setSearchScope('all')}
-              className={`px-3 py-1 text-xs rounded transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                 searchScope === 'all'
-                  ? 'bg-accent text-white'
-                  : 'text-text-secondary hover:text-text-primary'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
               }`}
             >
               全部
             </button>
             <button
               onClick={() => setSearchScope('books')}
-              className={`px-3 py-1 text-xs rounded transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                 searchScope === 'books'
-                  ? 'bg-accent text-white'
-                  : 'text-text-secondary hover:text-text-primary'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
               }`}
             >
               知识库
             </button>
             <button
               onClick={() => setSearchScope('documents')}
-              className={`px-3 py-1 text-xs rounded transition-colors ${
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
                 searchScope === 'documents'
-                  ? 'bg-accent text-white'
-                  : 'text-text-secondary hover:text-text-primary'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-bg-secondary'
               }`}
             >
               文档
@@ -228,14 +228,14 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
           <div className="flex-1" />
 
           {/* Sort buttons */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-0.5 bg-bg-primary rounded-lg p-0.5 border border-border">
             <button
               onClick={() => setSortType('lastAccessed')}
               title="按访问时间"
-              className={`p-1.5 rounded transition-colors ${
+              className={`p-2 rounded-md transition-all ${
                 sortType === 'lastAccessed'
-                  ? 'bg-accent text-white'
-                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-secondary'
               }`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -245,10 +245,10 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
             <button
               onClick={() => setSortType('name')}
               title="按名称"
-              className={`p-1.5 rounded transition-colors ${
+              className={`p-2 rounded-md transition-all ${
                 sortType === 'name'
-                  ? 'bg-accent text-white'
-                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-secondary'
               }`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -258,10 +258,10 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
             <button
               onClick={() => setSortType('docCount')}
               title="按文档数"
-              className={`p-1.5 rounded transition-colors ${
+              className={`p-2 rounded-md transition-all ${
                 sortType === 'docCount'
-                  ? 'bg-accent text-white'
-                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary'
+                  ? 'bg-accent text-white shadow-sm'
+                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-secondary'
               }`}
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -274,16 +274,25 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
         {/* Results */}
         <div className="flex-1 overflow-auto">
           {!searchQuery ? (
-            <div className="p-8 text-center text-text-secondary text-sm">
-              输入关键词开始搜索...
+            <div className="flex flex-col items-center justify-center h-full p-12 text-center">
+              <svg className="w-16 h-16 text-text-quaternary mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <p className="text-sm text-text-secondary">输入关键词开始搜索</p>
+              <p className="text-xs text-text-tertiary mt-2">支持搜索知识库名称和文档内容</p>
             </div>
           ) : isSearching ? (
-            <div className="p-8 text-center text-text-secondary text-sm">
-              搜索中...
+            <div className="flex flex-col items-center justify-center h-full p-12">
+              <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin mb-4" />
+              <p className="text-sm text-text-secondary">搜索中...</p>
             </div>
           ) : totalResults === 0 ? (
-            <div className="p-8 text-center text-text-secondary text-sm">
-              未找到匹配结果
+            <div className="flex flex-col items-center justify-center h-full p-12 text-center">
+              <svg className="w-16 h-16 text-text-quaternary mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-sm text-text-secondary">未找到匹配结果</p>
+              <p className="text-xs text-text-tertiary mt-2">试试其他关键词</p>
             </div>
           ) : (
             <div>
@@ -296,7 +305,7 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
                   {filteredBooks.map((book, index) => (
                     <div
                       key={book.id}
-                      className={`px-4 py-3 cursor-pointer transition-colors ${
+                      className={`px-4 py-3 cursor-pointer transition-colors border-b border-border-light last:border-b-0 ${
                         index === selectedIndex
                           ? 'bg-accent/10'
                           : 'hover:bg-bg-secondary'
@@ -304,17 +313,22 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
                       onClick={() => handleSelectResult(index)}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-base">
-                          {book.type === 'owner' ? '👤' : '👥'}
-                        </span>
+                        <div className="w-8 h-8 rounded-lg bg-bg-tertiary flex items-center justify-center flex-shrink-0">
+                          <span className="text-base">
+                            {book.type === 'owner' ? '👤' : '👥'}
+                          </span>
+                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm text-text-primary font-medium truncate">
                             {book.name}
                           </div>
-                          <div className="text-xs text-text-tertiary">
+                          <div className="text-xs text-text-tertiary mt-0.5">
                             {book.docCount} 个文档
                           </div>
                         </div>
+                        <svg className="w-4 h-4 text-text-quaternary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
                       </div>
                     </div>
                   ))}
@@ -332,30 +346,44 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
                     return (
                       <div
                         key={`${result.docId}-${result.matchType}`}
-                        className={`px-4 py-3 cursor-pointer transition-colors ${
+                        className={`px-4 py-3 cursor-pointer transition-colors border-b border-border-light last:border-b-0 ${
                           resultIndex === selectedIndex
                             ? 'bg-accent/10'
                             : 'hover:bg-bg-secondary'
                         }`}
                         onClick={() => handleSelectResult(resultIndex)}
                       >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`px-1.5 py-0.5 text-xs rounded ${
+                        <div className="flex items-start gap-2 mb-1.5">
+                          <span className={`px-1.5 py-0.5 text-xs rounded flex-shrink-0 ${
                             result.matchType === 'title'
                               ? 'bg-accent/10 text-accent'
                               : 'bg-green-500/10 text-green-600'
                           }`}>
                             {result.matchType === 'title' ? '标题' : '内容'}
                           </span>
-                          <span className="text-sm text-text-primary font-medium truncate flex-1">
-                            {result.title}
-                          </span>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm text-text-primary font-medium truncate">
+                              {result.title}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xs text-text-tertiary truncate">
-                          📚 {result.bookName}
+                        {/* Breadcrumb path */}
+                        <div className="flex items-center gap-1 text-xs text-text-tertiary mb-1">
+                          <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                          </svg>
+                          <span className="truncate">{result.bookName}</span>
+                          {result.path && (
+                            <>
+                              <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                              <span className="truncate text-text-quaternary">{result.path}</span>
+                            </>
+                          )}
                         </div>
                         {result.snippet && (
-                          <div className="text-xs text-text-tertiary mt-1 line-clamp-2">
+                          <div className="text-xs text-text-tertiary line-clamp-2 leading-relaxed">
                             {result.snippet}
                           </div>
                         )}
@@ -369,26 +397,27 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-border flex justify-between items-center bg-bg-secondary">
-          <div className="text-xs text-text-tertiary">
-            <span className="inline-flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-bg-tertiary rounded text-[10px] border border-border">↑↓</kbd>
-              选择
+        <div className="px-5 py-3 border-t border-border flex justify-between items-center bg-bg-secondary/30">
+          <div className="flex items-center gap-3 text-xs text-text-tertiary">
+            <span className="inline-flex items-center gap-1.5">
+              <kbd className="px-1.5 py-1 bg-bg-tertiary rounded text-[10px] border border-border font-mono min-w-[20px] text-center">↑</kbd>
+              <kbd className="px-1.5 py-1 bg-bg-tertiary rounded text-[10px] border border-border font-mono min-w-[20px] text-center">↓</kbd>
+              <span>导航</span>
             </span>
-            <span className="inline-flex items-center gap-1 ml-3">
-              <kbd className="px-1 py-0.5 bg-bg-tertiary rounded text-[10px] border border-border">Enter</kbd>
-              打开
+            <span className="inline-flex items-center gap-1.5">
+              <kbd className="px-1.5 py-1 bg-bg-tertiary rounded text-[10px] border border-border font-mono">Enter</kbd>
+              <span>打开</span>
             </span>
-            <span className="inline-flex items-center gap-1 ml-3">
-              <kbd className="px-1 py-0.5 bg-bg-tertiary rounded text-[10px] border border-border">ESC</kbd>
-              关闭
+            <span className="inline-flex items-center gap-1.5">
+              <kbd className="px-1.5 py-1 bg-bg-tertiary rounded text-[10px] border border-border font-mono">ESC</kbd>
+              <span>关闭</span>
             </span>
           </div>
           <button
             onClick={handleReset}
-            className="text-xs text-text-tertiary hover:text-text-primary transition-colors"
+            className="text-xs text-text-tertiary hover:text-text-primary transition-colors font-medium"
           >
-            重置
+            重置筛选
           </button>
         </div>
       </div>

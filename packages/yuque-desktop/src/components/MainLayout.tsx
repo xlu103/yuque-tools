@@ -490,37 +490,53 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       <div style={{ width: sidebarWidth }} className="flex-shrink-0">
         <MacSidebar
           topContent={
-            <div className="px-2 py-2 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center text-white text-sm font-medium">
-                {session.userName.charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-primary truncate">{session.userName}</p>
-                <p className="text-xs text-text-secondary truncate">@{session.login}</p>
-              </div>
+            <div className="px-2 py-2">
+              {/* Unified Search Trigger */}
+              <button
+                onClick={() => setShowUnifiedSearch(true)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm bg-bg-secondary border border-border rounded-lg text-text-tertiary hover:text-text-primary hover:border-accent transition-all group"
+              >
+                <svg className="w-4 h-4 group-hover:text-accent transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <span className="flex-1 text-left">搜索...</span>
+                <kbd className="px-1.5 py-0.5 bg-bg-tertiary rounded text-[10px] border border-border font-mono">⌘K</kbd>
+              </button>
             </div>
           }
           bottomContent={
-            <div className="flex items-center gap-1">
-              <button
-                onClick={loadBooks}
-                className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
-                title="刷新知识库"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setShowSettings(true)}
-                className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
-                title="设置"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
+            <div className="border-t border-border-light">
+              {/* User info - compact */}
+              <div className="px-3 py-2 flex items-center gap-2">
+                <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
+                  {session.userName.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-text-primary truncate">{session.userName}</p>
+                </div>
+              </div>
+              {/* Action buttons */}
+              <div className="px-2 pb-2 flex items-center gap-1">
+                <button
+                  onClick={loadBooks}
+                  className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+                  title="刷新知识库"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="p-2 rounded-md text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
+                  title="设置"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           }
         >
@@ -561,20 +577,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar - spans full width of main area */}
         <MacToolbar>
-          {/* Unified Search Trigger */}
-          <button
-            onClick={() => setShowUnifiedSearch(true)}
-            className="flex items-center gap-2 px-3 py-1 text-xs bg-bg-secondary border border-border rounded-md text-text-tertiary hover:text-text-primary hover:border-accent transition-colors"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span>搜索...</span>
-            <kbd className="ml-1 px-1 py-0.5 bg-bg-tertiary rounded text-[10px] border border-border">⌘K</kbd>
-          </button>
-          
-          <ToolbarDivider />
-          
           <ToolbarGroup>
             <ToolbarTitle>
               {selectedBook?.name || '选择知识库'}
