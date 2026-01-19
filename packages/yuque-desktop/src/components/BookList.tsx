@@ -48,7 +48,6 @@ export function BookList({ books, selectedId, onSelect, loading }: BookListProps
   const [editingGroupName, setEditingGroupName] = useState('')
   const [showNewGroupInput, setShowNewGroupInput] = useState(false)
   const [newGroupName, setNewGroupName] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
 
   // Load state on mount
   useEffect(() => {
@@ -71,14 +70,8 @@ export function BookList({ books, selectedId, onSelect, loading }: BookListProps
     // Initialize grouped map
     groups.forEach(g => grouped.set(g.id, []))
 
-    // Filter out hidden books and apply search
-    const visibleBooks = books.filter(book => {
-      if (isHidden(book.id)) return false
-      if (searchQuery.trim()) {
-        return book.name.toLowerCase().includes(searchQuery.toLowerCase())
-      }
-      return true
-    })
+    // Filter out hidden books
+    const visibleBooks = books.filter(book => !isHidden(book.id))
 
     visibleBooks.forEach(book => {
       if (isPinned(book.id)) {
@@ -127,7 +120,7 @@ export function BookList({ books, selectedId, onSelect, loading }: BookListProps
     })
 
     return { pinned, grouped, ungrouped }
-  }, [books, pinnedBookIds, groups, isPinned, getBookGroup, getLastAccessed, isHidden, searchQuery, sortType])
+  }, [books, pinnedBookIds, groups, isPinned, getBookGroup, getLastAccessed, isHidden, sortType])
 
   const handleContextMenu = useCallback((e: React.MouseEvent, bookId: string | null, groupId: string | null) => {
     e.preventDefault()
@@ -189,82 +182,10 @@ export function BookList({ books, selectedId, onSelect, loading }: BookListProps
 
   return (
     <div className="space-y-2">
-      {/* Search and Sort Controls - Compact Single Row */}
-      <div className="px-2">
-        <div className="flex items-center gap-1.5">
-          {/* Compact Search box */}
-          <div className="relative flex-1">
-            <svg className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="搜索..."
-              className="w-full pl-6 pr-6 py-1 text-xs bg-bg-secondary border border-border rounded text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text-primary"
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-
-          {/* Sort Icon Buttons */}
-          <div className="flex items-center gap-0.5 bg-bg-secondary border border-border rounded p-0.5">
-            <button
-              onClick={() => setSortType('lastAccessed')}
-              title="按访问时间"
-              className={`p-1 rounded transition-colors ${
-                sortType === 'lastAccessed' 
-                  ? 'bg-accent text-white' 
-                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setSortType('name')}
-              title="按名称"
-              className={`p-1 rounded transition-colors ${
-                sortType === 'name' 
-                  ? 'bg-accent text-white' 
-                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-              </svg>
-            </button>
-            <button
-              onClick={() => setSortType('docCount')}
-              title="按文档数"
-              className={`p-1 rounded transition-colors ${
-                sortType === 'docCount' 
-                  ? 'bg-accent text-white' 
-                  : 'text-text-tertiary hover:text-text-primary hover:bg-bg-tertiary'
-              }`}
-            >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Empty state for search */}
-      {searchQuery && organizedBooks.pinned.length === 0 && organizedBooks.ungrouped.length === 0 && Array.from(organizedBooks.grouped.values()).every(g => g.length === 0) && (
+      {/* Empty state for no visible books */}
+      {organizedBooks.pinned.length === 0 && organizedBooks.ungrouped.length === 0 && Array.from(organizedBooks.grouped.values()).every(g => g.length === 0) && (
         <div className="px-2 py-4 text-center">
-          <p className="text-xs text-text-secondary">未找到匹配的知识库</p>
+          <p className="text-xs text-text-secondary">暂无知识库</p>
         </div>
       )}
 

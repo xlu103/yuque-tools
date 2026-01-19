@@ -11,6 +11,7 @@ import { BookList } from './BookList'
 import { DocumentTree } from './DocumentTree'
 import { SettingsPanel } from './SettingsPanel'
 import { MarkdownPreview } from './MarkdownPreview'
+import { UnifiedSearchModal } from './UnifiedSearchModal'
 
 // Notes book ID constant
 const NOTES_BOOK_ID = '__notes__'
@@ -74,16 +75,10 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [previewFontSize, setPreviewFontSize] = useState(16)
   const [syncReminder, setSyncReminder] = useState<string | null>(null)
   const [showSyncMenu, setShowSyncMenu] = useState(false)
+  const [showUnifiedSearch, setShowUnifiedSearch] = useState(false)
   
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
-  
-  // Search state
-  const [searchQuery, setSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
-  const [isSearching, setIsSearching] = useState(false)
-  const [showSearchResults, setShowSearchResults] = useState(false)
-  const searchInputRef = useRef<HTMLInputElement>(null)
   
   // Network loading state (for background fetch indicator)
   const [isFetchingRemote, setIsFetchingRemote] = useState(false)
@@ -118,18 +113,14 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       const isMod = e.metaKey || e.ctrlKey
       
-      // Cmd/Ctrl + K: Focus search
+      // Cmd/Ctrl + K: Open unified search
       if (isMod && e.key === 'k') {
         e.preventDefault()
-        searchInputRef.current?.focus()
+        setShowUnifiedSearch(true)
       }
-      // Escape: Close preview or search results
-      if (e.key === 'Escape') {
-        if (showSearchResults) {
-          setShowSearchResults(false)
-        } else if (previewDoc) {
-          setPreviewDoc(null)
-        }
+      // Escape: Close preview
+      if (e.key === 'Escape' && previewDoc) {
+        setPreviewDoc(null)
       }
       // Cmd/Ctrl + W: Close preview
       if (isMod && e.key === 'w' && previewDoc) {
@@ -140,7 +131,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showSearchResults, previewDoc])
+  }, [previewDoc])
 
   // Load books and settings on mount
   useEffect(() => {
@@ -452,37 +443,20 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     }
   }, [cancelSync, setRunning, setProgress, showToast])
 
-  // Handle search
-  const handleSearch = useCallback(async () => {
-    if (!searchQuery.trim()) {
-      setSearchResults([])
-      setShowSearchResults(false)
-      return
-    }
-
-    setIsSearching(true)
-    setShowSearchResults(true)
-    try {
-      const results = await search(searchQuery.trim(), { limit: 20, searchContent: true })
-      setSearchResults(results)
-    } catch (error) {
-      console.error('Search failed:', error)
-      setSearchResults([])
-    } finally {
-      setIsSearching(false)
-    }
-  }, [searchQuery, search])
-
   // Handle search result click
   const handleSearchResultClick = useCallback((result: SearchResult) => {
     if (result.localPath && window.electronAPI) {
-      window.electronAPI['file:open'](result.localPath)
+      setPreviewDoc({ filePath: result.localPath, title: result.title })
+      addToHistory({ 
+        filePath: result.localPath, 
+        title: result.title, 
+        bookId: result.bookId, 
+        bookName: result.bookName 
+      })
     } else {
       setSelectedBookId(result.bookId)
     }
-    setShowSearchResults(false)
-    setSearchQuery('')
-  }, [setSelectedBookId])
+  }, [setSelectedBookId, addToHistory])
 
   // Handle book selection with last accessed tracking
   const handleSelectBook = useCallback((bookId: string) => {
@@ -490,13 +464,10 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     updateLastAccessed(bookId)
   }, [setSelectedBookId, updateLastAccessed])
 
-  // Close search results and sync menu when clicking outside
+  // Close sync menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      if (!target.closest('.search-container')) {
-        setShowSearchResults(false)
-      }
       if (!target.closest('.sync-menu-container')) {
         setShowSyncMenu(false)
       }
@@ -590,66 +561,17 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Toolbar - spans full width of main area */}
         <MacToolbar>
-          {/* Search box */}
-          <div className="search-container relative">
-            <div className="relative">
-              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-text-tertiary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSearch()
-                  if (e.key === 'Escape') {
-                    setShowSearchResults(false)
-                    setSearchQuery('')
-                  }
-                }}
-                onFocus={() => searchQuery && setShowSearchResults(true)}
-                placeholder="搜索文档..."
-                className="w-48 pl-8 pr-3 py-1 text-xs bg-bg-secondary border border-border rounded-md text-text-primary placeholder:text-text-tertiary focus:outline-none focus:ring-1 focus:ring-accent focus:w-64 transition-all"
-              />
-            </div>
-            
-            {/* Search results dropdown */}
-            {showSearchResults && (
-              <div className="absolute top-full left-0 mt-1 w-80 max-h-96 overflow-auto bg-bg-primary border border-border rounded-lg shadow-lg z-50">
-                {isSearching ? (
-                  <div className="p-4 text-center text-text-secondary text-sm">搜索中...</div>
-                ) : searchResults.length > 0 ? (
-                  <div className="divide-y divide-border-light">
-                    {searchResults.map((result) => (
-                      <div
-                        key={`${result.docId}-${result.matchType}`}
-                        className="px-3 py-2 hover:bg-bg-secondary cursor-pointer"
-                        onClick={() => handleSearchResultClick(result)}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`px-1 py-0.5 text-xs rounded ${
-                            result.matchType === 'title' 
-                              ? 'bg-accent/10 text-accent' 
-                              : 'bg-green-500/10 text-green-600'
-                          }`}>
-                            {result.matchType === 'title' ? '标题' : '内容'}
-                          </span>
-                          <span className="text-sm text-text-primary truncate flex-1">{result.title}</span>
-                        </div>
-                        <p className="text-xs text-text-tertiary mt-0.5 truncate">{result.bookName}</p>
-                        {result.snippet && (
-                          <p className="text-xs text-text-tertiary mt-0.5 line-clamp-1">{result.snippet}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : searchQuery ? (
-                  <div className="p-4 text-center text-text-secondary text-sm">未找到结果</div>
-                ) : null}
-              </div>
-            )}
-          </div>
+          {/* Unified Search Trigger */}
+          <button
+            onClick={() => setShowUnifiedSearch(true)}
+            className="flex items-center gap-2 px-3 py-1 text-xs bg-bg-secondary border border-border rounded-md text-text-tertiary hover:text-text-primary hover:border-accent transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <span>搜索...</span>
+            <kbd className="ml-1 px-1 py-0.5 bg-bg-tertiary rounded text-[10px] border border-border">⌘K</kbd>
+          </button>
           
           <ToolbarDivider />
           
@@ -866,6 +788,18 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
           )}
         </div>
       </div>
+
+      {/* Unified Search Modal */}
+      {showUnifiedSearch && (
+        <UnifiedSearchModal
+          books={books}
+          onClose={() => setShowUnifiedSearch(false)}
+          onSelectBook={(bookId) => {
+            handleSelectBook(bookId)
+          }}
+          onSelectDocument={handleSearchResultClick}
+        />
+      )}
     </div>
   )
 }

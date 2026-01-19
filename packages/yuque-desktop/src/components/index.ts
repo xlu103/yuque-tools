@@ -10,6 +10,7 @@ export { HiddenBooksPanel } from './HiddenBooksPanel'
 // Components
 export { BookList } from './BookList'
 export { DocumentTree } from './DocumentTree'
+export { UnifiedSearchModal } from './UnifiedSearchModal'
 
 // UI Components
 export * from './ui'
