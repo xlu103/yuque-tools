@@ -10,6 +10,8 @@ import { usePanelLayoutStore, PANEL_CONSTRAINTS } from '../stores/panelLayoutSto
 import { FailedDocsPanel } from './FailedDocsPanel'
 import { StatisticsPanel } from './StatisticsPanel'
 import { SyncHistoryPanel } from './SyncHistoryPanel'
+import { HiddenBooksPanel } from './HiddenBooksPanel'
+import { useBookOrganizeStore } from '../stores'
 
 interface SettingsPanelProps {
   onClose: () => void
@@ -43,6 +45,9 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
   const [showFailedDocs, setShowFailedDocs] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
+  const [showHiddenBooks, setShowHiddenBooks] = useState(false)
+
+  const { hiddenBookIds } = useBookOrganizeStore()
 
   // Load settings
   useEffect(() => {
@@ -186,6 +191,10 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
 
   if (showHistory) {
     return <SyncHistoryPanel onClose={() => setShowHistory(false)} />
+  }
+
+  if (showHiddenBooks) {
+    return <HiddenBooksPanel onClose={() => setShowHiddenBooks(false)} />
   }
 
   return (
@@ -397,6 +406,30 @@ export function SettingsPanel({ onClose, onLogout }: SettingsPanelProps) {
                   <span>12px</span>
                   <span>24px</span>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Knowledge Base Management */}
+          <section>
+            <h2 className="text-sm font-semibold text-text-primary mb-4">知识库管理</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-text-secondary mb-2">隐藏的知识库</label>
+                <MacButton 
+                  variant="secondary" 
+                  onClick={() => setShowHiddenBooks(true)}
+                >
+                  查看隐藏的知识库
+                  {hiddenBookIds.length > 0 && (
+                    <span className="ml-2 px-1.5 py-0.5 bg-accent/10 text-accent rounded text-xs">
+                      {hiddenBookIds.length}
+                    </span>
+                  )}
+                </MacButton>
+                <p className="mt-1 text-xs text-text-tertiary">
+                  管理已隐藏的知识库，可以恢复显示
+                </p>
               </div>
             </div>
           </section>

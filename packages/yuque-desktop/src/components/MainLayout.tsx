@@ -1,7 +1,7 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { useBooks, useSync, useSyncEvents, useToast, useIsElectron, useSettings, useSearch } from '../hooks'
 import type { Session, SyncProgress, SearchResult } from '../hooks'
-import { useBooksStore, useSyncStore, usePanelLayoutStore, useReadingHistoryStore } from '../stores'
+import { useBooksStore, useSyncStore, usePanelLayoutStore, useReadingHistoryStore, useBookOrganizeStore } from '../stores'
 import { MacSidebar, SidebarSection, SidebarItem } from './ui/MacSidebar'
 import { MacToolbar, ToolbarGroup, ToolbarDivider, ToolbarTitle } from './ui/MacToolbar'
 import { MacButton } from './ui/MacButton'
@@ -65,6 +65,9 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
 
   // Reading history
   const { history: readingHistory, addToHistory, loadHistory } = useReadingHistoryStore()
+
+  // Book organize (for last accessed tracking)
+  const { updateLastAccessed } = useBookOrganizeStore()
 
   const [showSettings, setShowSettings] = useState(false)
   const [hideFailedDocs, setHideFailedDocs] = useState(false)
@@ -481,6 +484,12 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     setSearchQuery('')
   }, [setSelectedBookId])
 
+  // Handle book selection with last accessed tracking
+  const handleSelectBook = useCallback((bookId: string) => {
+    setSelectedBookId(bookId)
+    updateLastAccessed(bookId)
+  }, [setSelectedBookId, updateLastAccessed])
+
   // Close search results and sync menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -563,7 +572,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             <BookList
               books={books}
               selectedId={selectedBookId}
-              onSelect={setSelectedBookId}
+              onSelect={handleSelectBook}
               loading={isLoadingBooks}
             />
           </SidebarSection>

@@ -9,11 +9,19 @@ export interface BookGroup {
   collapsed: boolean
 }
 
+export type BookSortType = 'lastAccessed' | 'name' | 'docCount'
+
 interface BookOrganizeState {
   /** 置顶的知识库 ID 列表 */
   pinnedBookIds: string[]
   /** 自定义分组 */
   groups: BookGroup[]
+  /** 知识库最后访问时间 Map<bookId, timestamp> */
+  lastAccessedTimes: Record<string, number>
+  /** 隐藏的知识库 ID 列表 */
+  hiddenBookIds: string[]
+  /** 排序方式 */
+  sortType: BookSortType
   /** 添加置顶 */
   pinBook: (bookId: string) => void
   /** 取消置顶 */
@@ -34,6 +42,18 @@ interface BookOrganizeState {
   toggleGroupCollapse: (groupId: string) => void
   /** 获取知识库所属分组 */
   getBookGroup: (bookId: string) => BookGroup | null
+  /** 更新知识库访问时间 */
+  updateLastAccessed: (bookId: string) => void
+  /** 获取知识库最后访问时间 */
+  getLastAccessed: (bookId: string) => number
+  /** 隐藏知识库 */
+  hideBook: (bookId: string) => void
+  /** 显示知识库 */
+  showBook: (bookId: string) => void
+  /** 检查是否隐藏 */
+  isHidden: (bookId: string) => boolean
+  /** 设置排序方式 */
+  setSortType: (sortType: BookSortType) => void
   /** 加载状态 */
   loadState: () => void
   /** 保存状态 */
@@ -43,6 +63,9 @@ interface BookOrganizeState {
 export const useBookOrganizeStore = create<BookOrganizeState>((set, get) => ({
   pinnedBookIds: [],
   groups: [],
+  lastAccessedTimes: {},
+  hiddenBookIds: [],
+  sortType: 'lastAccessed',
 
   pinBook: (bookId: string) => {
     set((state) => {
@@ -131,14 +154,55 @@ export const useBookOrganizeStore = create<BookOrganizeState>((set, get) => ({
     return get().groups.find(g => g.bookIds.includes(bookId)) || null
   },
 
+  updateLastAccessed: (bookId: string) => {
+    set((state) => ({
+      lastAccessedTimes: {
+        ...state.lastAccessedTimes,
+        [bookId]: Date.now()
+      }
+    }))
+    get().saveState()
+  },
+
+  getLastAccessed: (bookId: string) => {
+    return get().lastAccessedTimes[bookId] || 0
+  },
+
+  hideBook: (bookId: string) => {
+    set((state) => {
+      if (state.hiddenBookIds.includes(bookId)) return state
+      return { hiddenBookIds: [...state.hiddenBookIds, bookId] }
+    })
+    get().saveState()
+  },
+
+  showBook: (bookId: string) => {
+    set((state) => ({
+      hiddenBookIds: state.hiddenBookIds.filter(id => id !== bookId)
+    }))
+    get().saveState()
+  },
+
+  isHidden: (bookId: string) => {
+    return get().hiddenBookIds.includes(bookId)
+  },
+
+  setSortType: (sortType: BookSortType) => {
+    set({ sortType })
+    get().saveState()
+  },
+
   loadState: () => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY)
       if (saved) {
-        const { pinnedBookIds, groups } = JSON.parse(saved)
+        const { pinnedBookIds, groups, lastAccessedTimes, hiddenBookIds, sortType } = JSON.parse(saved)
         set({ 
           pinnedBookIds: pinnedBookIds || [],
-          groups: groups || []
+          groups: groups || [],
+          lastAccessedTimes: lastAccessedTimes || {},
+          hiddenBookIds: hiddenBookIds || [],
+          sortType: sortType || 'lastAccessed'
         })
       }
     } catch (error) {
@@ -148,8 +212,14 @@ export const useBookOrganizeStore = create<BookOrganizeState>((set, get) => ({
 
   saveState: () => {
     try {
-      const { pinnedBookIds, groups } = get()
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ pinnedBookIds, groups }))
+      const { pinnedBookIds, groups, lastAccessedTimes, hiddenBookIds, sortType } = get()
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ 
+        pinnedBookIds, 
+        groups, 
+        lastAccessedTimes,
+        hiddenBookIds,
+        sortType
+      }))
     } catch (error) {
       console.error('Failed to save book organize state:', error)
     }
