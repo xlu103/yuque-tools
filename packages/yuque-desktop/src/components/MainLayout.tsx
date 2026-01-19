@@ -1,9 +1,9 @@
 import { useEffect, useCallback, useState, useRef } from 'react'
-import { useBooks, useSync, useSyncEvents, useToast, useIsElectron, useSettings, useSearch } from '../hooks'
+import { useBooks, useSync, useSyncEvents, useToast, useIsElectron, useSettings } from '../hooks'
 import type { Session, SyncProgress, SearchResult } from '../hooks'
 import { useBooksStore, useSyncStore, usePanelLayoutStore, useReadingHistoryStore, useBookOrganizeStore } from '../stores'
 import { MacSidebar, SidebarSection, SidebarItem } from './ui/MacSidebar'
-import { MacToolbar, ToolbarGroup, ToolbarDivider, ToolbarTitle } from './ui/MacToolbar'
+import { MacToolbar, ToolbarGroup, ToolbarTitle } from './ui/MacToolbar'
 import { MacButton } from './ui/MacButton'
 import { MacProgress } from './ui/MacProgress'
 import { PanelResizer } from './ui/PanelResizer'
@@ -33,7 +33,6 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const { startSync, cancelSync } = useSync()
   const { getSettings } = useSettings()
   const { showToast } = useToast()
-  const { search } = useSearch()
   
   const { 
     books, 
@@ -800,6 +799,11 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             handleSelectBook(bookId)
           }}
           onSelectDocument={handleSearchResultClick}
+          onPreviewDocument={(result) => {
+            if (result.localPath) {
+              setPreviewDoc({ filePath: result.localPath, title: result.title })
+            }
+          }}
         />
       )}
     </div>

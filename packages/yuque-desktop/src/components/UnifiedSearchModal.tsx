@@ -9,17 +9,20 @@ interface UnifiedSearchModalProps {
   onClose: () => void
   onSelectBook: (bookId: string) => void
   onSelectDocument: (result: SearchResult) => void
+  onPreviewDocument?: (result: SearchResult) => void
 }
 
 type SearchScope = 'all' | 'books' | 'documents'
 
-export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocument }: UnifiedSearchModalProps) {
+export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocument, onPreviewDocument }: UnifiedSearchModalProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchScope, setSearchScope] = useState<SearchScope>('all')
   const [isSearching, setIsSearching] = useState(false)
   const [documentResults, setDocumentResults] = useState<SearchResult[]>([])
   const [selectedIndex, setSelectedIndex] = useState(0)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const resultsContainerRef = useRef<HTMLDivElement>(null)
+  const selectedItemRef = useRef<HTMLDivElement>(null)
   
   const { search } = useSearch()
   const {
@@ -98,9 +101,38 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
     setSelectedIndex(0)
   }, [filteredBooks, documentResults, searchScope])
 
+  // Preview document when selection changes (only for documents with localPath)
+  useEffect(() => {
+    if (!onPreviewDocument) return
+    
+    const bookCount = searchScope !== 'documents' ? filteredBooks.length : 0
+    
+    // Only preview if selected index is in document results range
+    if (selectedIndex >= bookCount) {
+      const docIndex = selectedIndex - bookCount
+      const doc = documentResults[docIndex]
+      if (doc && doc.localPath) {
+        onPreviewDocument(doc)
+      }
+    }
+  }, [selectedIndex, filteredBooks, documentResults, searchScope, onPreviewDocument])
+
+  // Scroll selected item into view
+  useEffect(() => {
+    if (selectedItemRef.current) {
+      selectedItemRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      })
+    }
+  }, [selectedIndex])
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't handle if no results
+      if (totalResults === 0) return
+
       if (e.key === 'ArrowDown') {
         e.preventDefault()
         setSelectedIndex(prev => Math.min(prev + 1, totalResults - 1))
@@ -116,8 +148,9 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
       }
     }
 
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    // Add listener to window to capture all keyboard events
+    window.addEventListener('keydown', handleKeyDown, true)
+    return () => window.removeEventListener('keydown', handleKeyDown, true)
   }, [selectedIndex, totalResults, onClose])
 
   // Auto focus search input
@@ -272,7 +305,7 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
         </div>
 
         {/* Results */}
-        <div className="flex-1 overflow-auto">
+        <div ref={resultsContainerRef} className="flex-1 overflow-auto">
           {!searchQuery ? (
             <div className="flex flex-col items-center justify-center h-full p-12 text-center">
               <svg className="w-16 h-16 text-text-quaternary mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -305,28 +338,35 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
                   {filteredBooks.map((book, index) => (
                     <div
                       key={book.id}
-                      className={`px-4 py-3 cursor-pointer transition-colors border-b border-border-light last:border-b-0 ${
+                      ref={index === selectedIndex ? selectedItemRef : null}
+                      className={`px-4 py-3 cursor-pointer transition-all border-b border-border-light last:border-b-0 ${
                         index === selectedIndex
-                          ? 'bg-accent/10'
-                          : 'hover:bg-bg-secondary'
+                          ? 'bg-accent/15 border-l-4 border-l-accent shadow-sm'
+                          : 'hover:bg-bg-secondary border-l-4 border-l-transparent'
                       }`}
                       onClick={() => handleSelectResult(index)}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-bg-tertiary flex items-center justify-center flex-shrink-0">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors ${
+                          index === selectedIndex ? 'bg-accent/20' : 'bg-bg-tertiary'
+                        }`}>
                           <span className="text-base">
                             {book.type === 'owner' ? '👤' : '👥'}
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm text-text-primary font-medium truncate">
+                          <div className={`text-sm font-medium truncate transition-colors ${
+                            index === selectedIndex ? 'text-accent' : 'text-text-primary'
+                          }`}>
                             {book.name}
                           </div>
                           <div className="text-xs text-text-tertiary mt-0.5">
                             {book.docCount} 个文档
                           </div>
                         </div>
-                        <svg className="w-4 h-4 text-text-quaternary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                          index === selectedIndex ? 'text-accent' : 'text-text-quaternary'
+                        }`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </div>
@@ -343,13 +383,15 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
                   </div>
                   {documentResults.map((result, index) => {
                     const resultIndex = searchScope !== 'documents' ? filteredBooks.length + index : index
+                    const isSelected = resultIndex === selectedIndex
                     return (
                       <div
                         key={`${result.docId}-${result.matchType}`}
-                        className={`px-4 py-3 cursor-pointer transition-colors border-b border-border-light last:border-b-0 ${
-                          resultIndex === selectedIndex
-                            ? 'bg-accent/10'
-                            : 'hover:bg-bg-secondary'
+                        ref={isSelected ? selectedItemRef : null}
+                        className={`px-4 py-3 cursor-pointer transition-all border-b border-border-light last:border-b-0 ${
+                          isSelected
+                            ? 'bg-accent/15 border-l-4 border-l-accent shadow-sm'
+                            : 'hover:bg-bg-secondary border-l-4 border-l-transparent'
                         }`}
                         onClick={() => handleSelectResult(resultIndex)}
                       >
@@ -362,10 +404,18 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
                             {result.matchType === 'title' ? '标题' : '内容'}
                           </span>
                           <div className="flex-1 min-w-0">
-                            <div className="text-sm text-text-primary font-medium truncate">
+                            <div className={`text-sm font-medium truncate ${
+                              isSelected ? 'text-accent' : 'text-text-primary'
+                            }`}>
                               {result.title}
                             </div>
                           </div>
+                          {isSelected && (
+                            <svg className="w-4 h-4 text-accent flex-shrink-0 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          )}
                         </div>
                         {/* Breadcrumb path */}
                         <div className="flex items-center gap-1 text-xs text-text-tertiary mb-1">
