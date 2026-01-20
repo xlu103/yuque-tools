@@ -16,7 +16,14 @@ export default defineConfig({
           build: {
             outDir: 'dist-electron',
             rollupOptions: {
-              external: ['better-sqlite3']
+              external: ['better-sqlite3'],
+              onwarn(warning, warn) {
+                // 忽略 jsencrypt-node 的 eval 警告
+                if (warning.code === 'EVAL' && warning.id?.includes('jsencrypt-node')) {
+                  return
+                }
+                warn(warning)
+              }
             }
           }
         }

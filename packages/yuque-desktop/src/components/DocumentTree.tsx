@@ -17,6 +17,7 @@ interface DocumentTreeProps {
   onPreview?: (doc: Document) => void
   onDocumentSynced?: (doc: Document) => void
   hideFailedDocs?: boolean
+  currentPreviewPath?: string
 }
 
 interface TreeNode extends Document {
@@ -72,7 +73,6 @@ function buildDocumentTree(documents: Document[]): TreeNode[] {
 
 function DocumentTreeNode({
   node,
-  isSelected,
   selectable,
   selectedIds,
   onToggleSelect,
@@ -86,10 +86,10 @@ function DocumentTreeNode({
   bookId,
   isCollapsed,
   onToggleCollapse,
-  syncingDocId
+  syncingDocId,
+  currentPreviewPath
 }: {
   node: TreeNode
-  isSelected: boolean
   selectable: boolean
   selectedIds: Set<string>
   onToggleSelect: (id: string) => void
@@ -104,12 +104,15 @@ function DocumentTreeNode({
   isCollapsed: boolean
   onToggleCollapse: () => void
   syncingDocId: string | null
+  currentPreviewPath?: string
 }) {
   const hasChildren = node.children.length > 0
   const isSynced = node.syncStatus === 'synced' && node.localPath
   const isFolder = node.docType === 'TITLE' || hasChildren
   const { isCollapsed: checkCollapsed, toggleNode, saveCollapseState } = useTreeCollapseStore()
   const isSyncing = syncingDocId === node.id
+  const isSelected = selectedIds?.has(node.id) || false
+  const isCurrentPreview = currentPreviewPath && node.localPath === currentPreviewPath
 
   const handleClick = () => {
     if (selectable) {
@@ -131,7 +134,7 @@ function DocumentTreeNode({
       <div
         className={`px-4 py-2 hover:bg-bg-secondary transition-all duration-150 group cursor-pointer flex items-start gap-2 ${
           isSelected ? 'bg-accent/5' : ''
-        } ${isSyncing ? 'bg-accent/5' : ''}`}
+        } ${isSyncing ? 'bg-accent/5' : ''} ${isCurrentPreview ? 'bg-accent/10 border-l-4 border-l-accent' : ''}`}
         style={{ paddingLeft: `${16 + node.level * 20}px` }}
         onClick={handleClick}
         onContextMenu={(e) => !isFolder && onContextMenu(e, node)}
@@ -240,7 +243,6 @@ function DocumentTreeNode({
               <DocumentTreeNode
                 key={child.id}
                 node={child}
-                isSelected={selectedIds.has(child.id)}
                 selectable={selectable}
                 selectedIds={selectedIds}
                 onToggleSelect={onToggleSelect}
@@ -260,6 +262,7 @@ function DocumentTreeNode({
                   }
                 }}
                 syncingDocId={syncingDocId}
+                currentPreviewPath={currentPreviewPath}
               />
             )
           })}
@@ -280,7 +283,8 @@ export function DocumentTree({
   bookId,
   onPreview,
   onDocumentSynced,
-  hideFailedDocs = false
+  hideFailedDocs = false,
+  currentPreviewPath
 }: DocumentTreeProps) {
   const isElectron = useIsElectron()
   const { syncSingleDoc } = useSync()
@@ -297,8 +301,15 @@ export function DocumentTree({
 
   // Filter out failed documents if hideFailedDocs is enabled
   const filteredDocuments = useMemo(() => {
+    console.log('[DocumentTree] Filtering documents:', { 
+      hideFailedDocs, 
+      totalDocs: documents.length,
+      failedDocs: documents.filter(d => d.syncStatus === 'failed').length
+    })
     if (!hideFailedDocs) return documents
-    return documents.filter(doc => doc.syncStatus !== 'failed')
+    const filtered = documents.filter(doc => doc.syncStatus !== 'failed')
+    console.log('[DocumentTree] After filtering:', { filteredCount: filtered.length })
+    return filtered
   }, [documents, hideFailedDocs])
 
   const tree = useMemo(() => buildDocumentTree(filteredDocuments), [filteredDocuments])
@@ -535,7 +546,6 @@ export function DocumentTree({
             <DocumentTreeNode
               key={node.id}
               node={node}
-              isSelected={selectedIds.has(node.id)}
               selectable={selectable}
               selectedIds={selectedIds}
               onToggleSelect={handleToggleSelect}
@@ -555,6 +565,7 @@ export function DocumentTree({
                 }
               }}
               syncingDocId={syncingDocId}
+              currentPreviewPath={currentPreviewPath}
             />
           )
         })}

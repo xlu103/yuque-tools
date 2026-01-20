@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { KnowledgeBase, SearchResult } from '../hooks'
 import { useSearch } from '../hooks'
-import { useBookOrganizeStore } from '../stores'
+import { useBookOrganizeStore, useSearchHistoryStore } from '../stores'
 import type { BookSortType } from '../stores/bookOrganizeStore'
 
 interface UnifiedSearchModalProps {
@@ -31,6 +31,19 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
     getLastAccessed,
     isHidden
   } = useBookOrganizeStore()
+  
+  const {
+    history: searchHistory,
+    addToHistory: addSearchToHistory,
+    removeFromHistory: removeSearchFromHistory,
+    clearHistory: clearSearchHistory,
+    loadHistory: loadSearchHistory
+  } = useSearchHistoryStore()
+  
+  // Load search history on mount
+  useEffect(() => {
+    loadSearchHistory()
+  }, [loadSearchHistory])
 
   // Filter and sort books based on search query
   const filteredBooks = useMemo(() => {
@@ -77,6 +90,10 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
       try {
         const results = await search(searchQuery.trim(), { limit: 20, searchContent: true })
         setDocumentResults(results)
+        // Add to search history when search completes successfully
+        if (results.length > 0) {
+          addSearchToHistory(searchQuery.trim())
+        }
       } catch (error) {
         console.error('Search failed:', error)
         setDocumentResults([])
@@ -87,7 +104,14 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
 
     const timer = setTimeout(searchDocuments, 300)
     return () => clearTimeout(timer)
-  }, [searchQuery, searchScope, search])
+  }, [searchQuery, searchScope, search, addSearchToHistory])
+  
+  // Add to search history when book search has results
+  useEffect(() => {
+    if (searchQuery.trim() && filteredBooks.length > 0 && searchScope !== 'documents') {
+      addSearchToHistory(searchQuery.trim())
+    }
+  }, [filteredBooks, searchQuery, searchScope, addSearchToHistory])
 
   // Calculate total results
   const totalResults = useMemo(() => {
@@ -307,12 +331,59 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
         {/* Results */}
         <div ref={resultsContainerRef} className="flex-1 overflow-auto">
           {!searchQuery ? (
-            <div className="flex flex-col items-center justify-center h-full p-12 text-center">
-              <svg className="w-16 h-16 text-text-quaternary mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <p className="text-sm text-text-secondary">输入关键词开始搜索</p>
-              <p className="text-xs text-text-tertiary mt-2">支持搜索知识库名称和文档内容</p>
+            <div className="p-6">
+              {/* Search history */}
+              {searchHistory.length > 0 ? (
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-medium text-text-secondary">搜索历史</h3>
+                    <button
+                      onClick={clearSearchHistory}
+                      className="text-xs text-text-tertiary hover:text-text-primary transition-colors"
+                    >
+                      清空
+                    </button>
+                  </div>
+                  <div className="space-y-1">
+                    {searchHistory.map((query, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-bg-secondary transition-colors group"
+                      >
+                        <svg className="w-4 h-4 text-text-tertiary flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <button
+                          onClick={() => setSearchQuery(query)}
+                          className="flex-1 text-left text-sm text-text-primary hover:text-accent transition-colors"
+                        >
+                          {query}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            removeSearchFromHistory(query)
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1 text-text-tertiary hover:text-error transition-all"
+                          title="删除"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <svg className="w-16 h-16 text-text-quaternary mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <p className="text-sm text-text-secondary">输入关键词开始搜索</p>
+                  <p className="text-xs text-text-tertiary mt-2">支持搜索知识库名称和文档内容</p>
+                </div>
+              )}
             </div>
           ) : isSearching ? (
             <div className="flex flex-col items-center justify-center h-full p-12">

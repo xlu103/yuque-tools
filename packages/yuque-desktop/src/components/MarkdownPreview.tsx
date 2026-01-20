@@ -21,6 +21,50 @@ interface TocItem {
   level: number
 }
 
+// 从文本中移除 HTML 标签和 Markdown 格式，提取纯文本
+function extractPlainText(text: string): string {
+  // Remove HTML tags
+  let plainText = text.replace(/<[^>]+>/g, '')
+  
+  // Remove markdown formatting
+  plainText = plainText.replace(/[*_`\[\]]/g, '').trim()
+  
+  // Decode HTML entities
+  plainText = plainText
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+  
+  return plainText
+}
+
+// 从 React 子元素中提取纯文本（递归处理）
+function extractTextFromChildren(children: any): string {
+  if (typeof children === 'string') {
+    return children
+  }
+  
+  if (typeof children === 'number') {
+    return String(children)
+  }
+  
+  if (Array.isArray(children)) {
+    return children.map(extractTextFromChildren).join('')
+  }
+  
+  if (children && typeof children === 'object') {
+    // React element
+    if (children.props && children.props.children) {
+      return extractTextFromChildren(children.props.children)
+    }
+  }
+  
+  return ''
+}
+
 // 从 Markdown 内容提取目录
 function extractToc(content: string): TocItem[] {
   const headingRegex = /^(#{1,6})\s+(.+)$/gm
@@ -29,8 +73,9 @@ function extractToc(content: string): TocItem[] {
   
   while ((match = headingRegex.exec(content)) !== null) {
     const level = match[1].length
-    const text = match[2].replace(/[*_`\[\]]/g, '').trim()
+    const text = extractPlainText(match[2])
     const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fa5-]/g, '')
+    console.log('[TOC] raw:', match[2], 'text:', text, 'id:', id)
     toc.push({ id, text, level })
   }
   
@@ -381,23 +426,31 @@ export function MarkdownPreview({
                 ol: ({ children }) => <ol className="list-decimal pl-6 my-2 space-y-1">{children}</ol>,
                 li: ({ children }) => <li className="leading-relaxed">{children}</li>,
                 h1: ({ children }) => {
-                  const text = String(children).replace(/[*_`\[\]]/g, '').trim()
+                  const rawText = extractTextFromChildren(children)
+                  const text = extractPlainText(rawText)
                   const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fa5-]/g, '')
+                  console.log('[H1] rawText:', rawText, 'text:', text, 'id:', id)
                   return <h1 data-heading-id={id} className="text-2xl font-bold mt-6 mb-4 pb-2 border-b border-border">{children}</h1>
                 },
                 h2: ({ children }) => {
-                  const text = String(children).replace(/[*_`\[\]]/g, '').trim()
+                  const rawText = extractTextFromChildren(children)
+                  const text = extractPlainText(rawText)
                   const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fa5-]/g, '')
+                  console.log('[H2] rawText:', rawText, 'text:', text, 'id:', id)
                   return <h2 data-heading-id={id} className="text-xl font-bold mt-5 mb-3 pb-1 border-b border-border-light">{children}</h2>
                 },
                 h3: ({ children }) => {
-                  const text = String(children).replace(/[*_`\[\]]/g, '').trim()
+                  const rawText = extractTextFromChildren(children)
+                  const text = extractPlainText(rawText)
                   const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fa5-]/g, '')
+                  console.log('[H3] rawText:', rawText, 'text:', text, 'id:', id)
                   return <h3 data-heading-id={id} className="text-lg font-semibold mt-4 mb-2">{children}</h3>
                 },
                 h4: ({ children }) => {
-                  const text = String(children).replace(/[*_`\[\]]/g, '').trim()
+                  const rawText = extractTextFromChildren(children)
+                  const text = extractPlainText(rawText)
                   const id = text.toLowerCase().replace(/\s+/g, '-').replace(/[^\w\u4e00-\u9fa5-]/g, '')
+                  console.log('[H4] rawText:', rawText, 'text:', text, 'id:', id)
                   return <h4 data-heading-id={id} className="text-base font-semibold mt-3 mb-2">{children}</h4>
                 },
                 p: ({ children }) => <p className="my-3 leading-relaxed">{children}</p>,

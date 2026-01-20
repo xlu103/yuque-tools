@@ -5,3 +5,4 @@ export { usePanelLayoutStore, clampWidth, PANEL_CONSTRAINTS } from './panelLayou
 export { useTreeCollapseStore } from './treeCollapseStore'
 export { useBookOrganizeStore, type BookGroup, type BookSortType } from './bookOrganizeStore'
 export { useReadingHistoryStore, type ReadingHistoryItem } from './readingHistoryStore'
+export { useSearchHistoryStore } from './searchHistoryStore'

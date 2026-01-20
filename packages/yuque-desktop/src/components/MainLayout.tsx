@@ -30,7 +30,7 @@ interface MainLayoutProps {
 
 export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const isElectron = useIsElectron()
-  const { listBooks, getBookDocs, getLocalDocs, getAllNotesForSync } = useBooks()
+  const { listBooks, getBookDocs, getLocalDocs, getAllNotesForSync, loadMoreNotes } = useBooks()
   const { startSync, cancelSync } = useSync()
   const { getSettings } = useSettings()
   const { showToast } = useToast()
@@ -78,6 +78,11 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [showUnifiedSearch, setShowUnifiedSearch] = useState(false)
   const [showAllBooksView, setShowAllBooksView] = useState(false)
   
+  // Notes lazy loading state
+  const [notesOffset, setNotesOffset] = useState(0)
+  const [notesHasMore, setNotesHasMore] = useState(true)
+  const [loadingMoreNotes, setLoadingMoreNotes] = useState(false)
+  
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
   
@@ -87,6 +92,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   // Auto sync timer ref
   const autoSyncTimerRef = useRef<NodeJS.Timeout | null>(null)
   const autoSyncIntervalRef = useRef<number>(0)
+  const isInitialMount = useRef(true)
 
   // Keyboard shortcut handlers
   useEffect(() => {
@@ -144,6 +150,10 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     getSettings().then(settings => {
       setHideFailedDocs(settings.hideFailedDocs || false)
       setPreviewFontSize(settings.previewFontSize || 16)
+      console.log('[MainLayout] Initial settings loaded:', { 
+        hideFailedDocs: settings.hideFailedDocs, 
+        previewFontSize: settings.previewFontSize 
+      })
     }).catch(console.error)
     
     // Check last sync time for reminder (7 days threshold)
@@ -208,6 +218,13 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
 
   // Reload auto sync settings when returning from settings panel
   useEffect(() => {
+    // Skip on initial mount
+    if (isInitialMount.current) {
+      isInitialMount.current = false
+      return
+    }
+    
+    // Only reload when settings panel is closed
     if (!showSettings) {
       // Settings panel closed, check if settings changed
       const checkAutoSyncSettings = async () => {
@@ -218,6 +235,11 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
           // Also update hideFailedDocs setting
           setHideFailedDocs(settings.hideFailedDocs || false)
           setPreviewFontSize(settings.previewFontSize || 16)
+          
+          console.log('[MainLayout] Settings reloaded:', { 
+            hideFailedDocs: settings.hideFailedDocs, 
+            previewFontSize: settings.previewFontSize 
+          })
           
           if (newInterval !== autoSyncIntervalRef.current) {
             // Interval changed, clear and reset timer
@@ -282,19 +304,14 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   }, [selectedBookId])
 
   const loadDocuments = useCallback(async (bookId: string) => {
-    // Special handling for notes book - fetch all notes first
+    // Reset notes loading state when switching books
     if (bookId === NOTES_BOOK_ID) {
-      setIsFetchingRemote(true)
-      try {
-        showToast('info', '正在获取所有小记...')
-        await getAllNotesForSync()
-      } catch (error) {
-        console.error('Failed to fetch all notes:', error)
-        showToast('error', '获取小记失败')
-      } finally {
-        setIsFetchingRemote(false)
-      }
+      setNotesOffset(0)
+      setNotesHasMore(true)
     }
+    
+    // For notes book, don't fetch all notes at once - use lazy loading instead
+    // Just load local cached notes first
     
     // Step 1: First load local cached documents (instant)
     try {
@@ -307,7 +324,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       console.error('Failed to load local docs:', error)
     }
     
-    // Step 2: Fetch from network in background (skip for notes as we already fetched)
+    // Step 2: Fetch from network in background (skip for notes as we use lazy loading)
     if (bookId !== NOTES_BOOK_ID) {
       setIsFetchingRemote(true)
     }
@@ -459,9 +476,42 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       console.error('Failed to cancel sync:', error)
     }
   }, [cancelSync, setRunning, setProgress, showToast])
+  
+  // Load more notes (lazy loading)
+  const handleLoadMoreNotes = useCallback(async () => {
+    if (!selectedBookId || selectedBookId !== NOTES_BOOK_ID || loadingMoreNotes || !notesHasMore) {
+      return
+    }
+    
+    setLoadingMoreNotes(true)
+    try {
+      const result = await loadMoreNotes(notesOffset, 50)
+      
+      // Merge with existing documents
+      const existingDocs = getDocumentsForBook(NOTES_BOOK_ID)
+      const newDocs = [...existingDocs, ...result.notes]
+      setDocuments(NOTES_BOOK_ID, newDocs)
+      
+      // Update state
+      setNotesOffset(notesOffset + result.notes.length)
+      setNotesHasMore(result.hasMore)
+      
+      showToast('success', `加载了 ${result.notes.length} 条小记`)
+    } catch (error) {
+      console.error('Failed to load more notes:', error)
+      showToast('error', '加载小记失败')
+    } finally {
+      setLoadingMoreNotes(false)
+    }
+  }, [selectedBookId, loadingMoreNotes, notesHasMore, notesOffset, loadMoreNotes, getDocumentsForBook, setDocuments, showToast])
 
   // Handle search result click
   const handleSearchResultClick = useCallback((result: SearchResult) => {
+    // Always switch to the book that contains this document
+    setSelectedBookId(result.bookId)
+    updateLastAccessed(result.bookId)
+    
+    // If document has local path, open it for preview
     if (result.localPath && window.electronAPI) {
       setPreviewDoc({ filePath: result.localPath, title: result.title })
       addToHistory({ 
@@ -470,10 +520,8 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
         bookId: result.bookId, 
         bookName: result.bookName 
       })
-    } else {
-      setSelectedBookId(result.bookId)
     }
-  }, [setSelectedBookId, addToHistory])
+  }, [setSelectedBookId, updateLastAccessed, addToHistory])
 
   // Handle book selection with last accessed tracking
   const handleSelectBook = useCallback((bookId: string) => {
@@ -740,32 +788,60 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
               {/* Document list with fixed width */}
               <div 
                 style={{ width: documentListWidth }} 
-                className="flex-shrink-0 overflow-auto border-r border-border-light transition-all duration-200"
+                className="flex-shrink-0 flex flex-col border-r border-border-light transition-all duration-200"
               >
-                <DocumentTree
-                  documents={currentDocs}
-                  loading={isLoadingDocs}
-                  emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
-                  bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
-                  bookId={selectedBookId || undefined}
-                  hideFailedDocs={hideFailedDocs}
-                  onPreview={(doc) => {
-                    if (doc.localPath) {
-                      setPreviewDoc({ filePath: doc.localPath, title: doc.title })
-                      addToHistory({ filePath: doc.localPath, title: doc.title, bookId: selectedBookId || undefined, bookName: selectedBook?.name })
-                    }
-                  }}
-                  onDocumentSynced={(doc) => {
-                    // Update document in store after single doc sync
-                    if (selectedBookId) {
-                      const docs = getDocumentsForBook(selectedBookId)
-                      const updatedDocs = docs.map(d => 
-                        d.id === doc.id ? { ...d, ...doc } : d
-                      )
-                      setDocuments(selectedBookId, updatedDocs)
-                    }
-                  }}
-                />
+                <div className="flex-1 overflow-auto">
+                  <DocumentTree
+                    documents={currentDocs}
+                    loading={isLoadingDocs}
+                    emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
+                    bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
+                    bookId={selectedBookId || undefined}
+                    hideFailedDocs={hideFailedDocs}
+                    currentPreviewPath={previewDoc?.filePath}
+                    onPreview={(doc) => {
+                      if (doc.localPath) {
+                        setPreviewDoc({ filePath: doc.localPath, title: doc.title })
+                        addToHistory({ filePath: doc.localPath, title: doc.title, bookId: selectedBookId || undefined, bookName: selectedBook?.name })
+                      }
+                    }}
+                    onDocumentSynced={(doc) => {
+                      // Update document in store after single doc sync
+                      if (selectedBookId) {
+                        const docs = getDocumentsForBook(selectedBookId)
+                        const updatedDocs = docs.map(d => 
+                          d.id === doc.id ? { ...d, ...doc } : d
+                        )
+                        setDocuments(selectedBookId, updatedDocs)
+                      }
+                    }}
+                  />
+                </div>
+                
+                {/* Load more notes button */}
+                {selectedBookId === NOTES_BOOK_ID && notesHasMore && (
+                  <div className="border-t border-border-light p-3">
+                    <button
+                      onClick={handleLoadMoreNotes}
+                      disabled={loadingMoreNotes}
+                      className="w-full px-4 py-2 text-sm bg-bg-secondary hover:bg-bg-tertiary text-text-primary rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {loadingMoreNotes ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                          <span>加载中...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                          <span>加载更多小记 (50条)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Document List Resizer */}
