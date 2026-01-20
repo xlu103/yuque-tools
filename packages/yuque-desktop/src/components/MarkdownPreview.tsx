@@ -133,7 +133,7 @@ function processHorizontalRules(content: string): string {
 
 // 图片组件 - 通过 IPC 加载本地图片
 // 图片查看器状态 - 使用简单的模块级状态避免 prop drilling
-let imageViewerState: { src: string; show: (src: string) => void } | null = null
+// let imageViewerState: { src: string; show: (src: string) => void } | null = null
 
 // 图片查看器组件
 function ImageViewer({ src, onClose }: { src: string; onClose: () => void }) {

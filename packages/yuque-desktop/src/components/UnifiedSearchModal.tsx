@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import type { KnowledgeBase, SearchResult } from '../hooks'
 import { useSearch } from '../hooks'
 import { useBookOrganizeStore, useSearchHistoryStore } from '../stores'
-import type { BookSortType } from '../stores/bookOrganizeStore'
+// import type { BookSortType } from '../stores/bookOrganizeStore'
 
 interface UnifiedSearchModalProps {
   books: KnowledgeBase[]
@@ -494,14 +494,14 @@ export function UnifiedSearchModal({ books, onClose, onSelectBook, onSelectDocum
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                           </svg>
                           <span className="truncate">{result.bookName}</span>
-                          {result.path && (
+                          {/* {result.path && (
                             <>
                               <svg className="w-3 h-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
                               <span className="truncate text-text-quaternary">{result.path}</span>
                             </>
-                          )}
+                          )} */}
                         </div>
                         {result.snippet && (
                           <div className="text-xs text-text-tertiary line-clamp-2 leading-relaxed">

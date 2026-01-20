@@ -37,10 +37,10 @@ export function BookList({ books, selectedId, onSelect, loading }: BookListProps
     getBookGroup,
     getLastAccessed,
     hideBook,
-    showBook,
+    // showBook,
     isHidden,
     sortType,
-    setSortType,
+    // setSortType,
     loadState
   } = useBookOrganizeStore()
 
@@ -69,7 +69,7 @@ export function BookList({ books, selectedId, onSelect, loading }: BookListProps
     const pinned: KnowledgeBase[] = []
     const grouped: Map<string, KnowledgeBase[]> = new Map()
     const ungrouped: KnowledgeBase[] = []
-    let notesBook: KnowledgeBase | null = null
+    let notesBook: KnowledgeBase | null = null as KnowledgeBase | null
 
     // Initialize grouped map
     groups.forEach(g => grouped.set(g.id, []))
