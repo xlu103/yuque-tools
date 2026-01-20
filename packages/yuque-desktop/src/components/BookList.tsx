@@ -3,6 +3,9 @@ import type { KnowledgeBase } from '../hooks'
 import { useBookOrganizeStore } from '../stores'
 import { SidebarItem } from './ui/MacSidebar'
 
+// Notes book ID constant
+const NOTES_BOOK_ID = '__notes__'
+
 interface BookListProps {
   books: KnowledgeBase[]
   selectedId: string | null
@@ -66,12 +69,20 @@ export function BookList({ books, selectedId, onSelect, loading }: BookListProps
     const pinned: KnowledgeBase[] = []
     const grouped: Map<string, KnowledgeBase[]> = new Map()
     const ungrouped: KnowledgeBase[] = []
+    let notesBook: KnowledgeBase | null = null
 
     // Initialize grouped map
     groups.forEach(g => grouped.set(g.id, []))
 
-    // Filter out hidden books
-    const visibleBooks = books.filter(book => !isHidden(book.id))
+    // Filter out hidden books and separate notes
+    const visibleBooks = books.filter(book => {
+      if (isHidden(book.id)) return false
+      if (book.id === NOTES_BOOK_ID) {
+        notesBook = book
+        return false
+      }
+      return true
+    })
 
     visibleBooks.forEach(book => {
       if (isPinned(book.id)) {
@@ -119,7 +130,7 @@ export function BookList({ books, selectedId, onSelect, loading }: BookListProps
       groupBooks.sort(sortBooks)
     })
 
-    return { pinned, grouped, ungrouped }
+    return { pinned, grouped, ungrouped, notesBook }
   }, [books, pinnedBookIds, groups, isPinned, getBookGroup, getLastAccessed, isHidden, sortType])
 
   const handleContextMenu = useCallback((e: React.MouseEvent, bookId: string | null, groupId: string | null) => {
@@ -182,8 +193,36 @@ export function BookList({ books, selectedId, onSelect, loading }: BookListProps
 
   return (
     <div className="space-y-2">
+      {/* Notes section - special display */}
+      {organizedBooks.notesBook && (
+        <div>
+          <div className="px-2 py-1 text-xs text-text-tertiary font-medium flex items-center gap-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm0 4c1.66 0 3 1.34 3 3s-1.34 3-3 3-3-1.34-3-3 1.34-3 3-3zm6 12H6v-1.4c0-2 4-3.1 6-3.1s6 1.1 6 3.1V19z"/>
+            </svg>
+            <span>小记</span>
+          </div>
+          <div className="space-y-0.5">
+            <div
+              key={organizedBooks.notesBook.id}
+              onContextMenu={(e) => handleContextMenu(e, organizedBooks.notesBook!.id, null)}
+              className="relative group"
+            >
+              <SidebarItem
+                icon={
+                  <span className="text-base">📝</span>
+                }
+                label={organizedBooks.notesBook.name}
+                selected={organizedBooks.notesBook.id === selectedId}
+                onClick={() => onSelect(organizedBooks.notesBook!.id)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Empty state for no visible books */}
-      {organizedBooks.pinned.length === 0 && organizedBooks.ungrouped.length === 0 && Array.from(organizedBooks.grouped.values()).every(g => g.length === 0) && (
+      {organizedBooks.pinned.length === 0 && organizedBooks.ungrouped.length === 0 && Array.from(organizedBooks.grouped.values()).every(g => g.length === 0) && !organizedBooks.notesBook && (
         <div className="px-2 py-4 text-center">
           <p className="text-xs text-text-secondary">暂无知识库</p>
         </div>

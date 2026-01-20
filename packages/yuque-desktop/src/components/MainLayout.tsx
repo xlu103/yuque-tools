@@ -12,6 +12,7 @@ import { DocumentTree } from './DocumentTree'
 import { SettingsPanel } from './SettingsPanel'
 import { MarkdownPreview } from './MarkdownPreview'
 import { UnifiedSearchModal } from './UnifiedSearchModal'
+import { AllBooksView } from './AllBooksView'
 
 // Notes book ID constant
 const NOTES_BOOK_ID = '__notes__'
@@ -75,6 +76,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   const [syncReminder, setSyncReminder] = useState<string | null>(null)
   const [showSyncMenu, setShowSyncMenu] = useState(false)
   const [showUnifiedSearch, setShowUnifiedSearch] = useState(false)
+  const [showAllBooksView, setShowAllBooksView] = useState(false)
   
   // Preview state
   const [previewDoc, setPreviewDoc] = useState<{ filePath: string; title: string } | null>(null)
@@ -280,6 +282,20 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
   }, [selectedBookId])
 
   const loadDocuments = useCallback(async (bookId: string) => {
+    // Special handling for notes book - fetch all notes first
+    if (bookId === NOTES_BOOK_ID) {
+      setIsFetchingRemote(true)
+      try {
+        showToast('info', '正在获取所有小记...')
+        await getAllNotesForSync()
+      } catch (error) {
+        console.error('Failed to fetch all notes:', error)
+        showToast('error', '获取小记失败')
+      } finally {
+        setIsFetchingRemote(false)
+      }
+    }
+    
     // Step 1: First load local cached documents (instant)
     try {
       const localDocs = await getLocalDocs(bookId)
@@ -291,8 +307,10 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
       console.error('Failed to load local docs:', error)
     }
     
-    // Step 2: Fetch from network in background
-    setIsFetchingRemote(true)
+    // Step 2: Fetch from network in background (skip for notes as we already fetched)
+    if (bookId !== NOTES_BOOK_ID) {
+      setIsFetchingRemote(true)
+    }
     try {
       const docs = await getBookDocs(bookId)
       setDocuments(bookId, docs)
@@ -337,7 +355,7 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
     } finally {
       setIsFetchingRemote(false)
     }
-  }, [getLocalDocs, getBookDocs, setDocuments, showToast, onLogout, isRunning, getSettings, startSync, setRunning, getDocumentsForBook])
+  }, [getLocalDocs, getBookDocs, setDocuments, showToast, onLogout, isRunning, getSettings, startSync, setRunning, getDocumentsForBook, getAllNotesForSync, setIsFetchingRemote])
 
   // Handle sync events
   useSyncEvents({
@@ -553,12 +571,32 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
             </SidebarSection>
           )}
           
+          {/* All Books View Toggle */}
+          <SidebarSection title="">
+            <SidebarItem
+              icon={
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+              }
+              label="所有知识库"
+              selected={showAllBooksView}
+              onClick={() => {
+                setShowAllBooksView(true)
+                setSelectedBookId(null)
+              }}
+            />
+          </SidebarSection>
+          
           {/* Book list */}
           <SidebarSection title="知识库">
             <BookList
               books={books}
               selectedId={selectedBookId}
-              onSelect={handleSelectBook}
+              onSelect={(bookId) => {
+                setShowAllBooksView(false)
+                handleSelectBook(bookId)
+              }}
               loading={isLoadingBooks}
             />
           </SidebarSection>
@@ -674,53 +712,78 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
 
         {/* Document list and Preview panel in same horizontal container */}
         <div className="flex-1 flex overflow-hidden">
-          {/* Document list with fixed width */}
-          <div 
-            style={{ width: documentListWidth }} 
-            className="flex-shrink-0 overflow-auto border-r border-border-light transition-all duration-200"
-          >
-            <DocumentTree
-              documents={currentDocs}
-              loading={isLoadingDocs}
-              emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
-              bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
-              bookId={selectedBookId || undefined}
-              hideFailedDocs={hideFailedDocs}
-              onPreview={(doc) => {
+          {showAllBooksView ? (
+            /* All Books Grid View */
+            <AllBooksView
+              books={books}
+              allDocuments={new Map(books.map(b => [b.id, getDocumentsForBook(b.id)]))}
+              onSelectBook={(bookId) => {
+                setShowAllBooksView(false)
+                handleSelectBook(bookId)
+              }}
+              onSelectDocument={(bookId, doc) => {
+                setShowAllBooksView(false)
+                handleSelectBook(bookId)
                 if (doc.localPath) {
                   setPreviewDoc({ filePath: doc.localPath, title: doc.title })
-                  addToHistory({ filePath: doc.localPath, title: doc.title, bookId: selectedBookId || undefined, bookName: selectedBook?.name })
-                }
-              }}
-              onDocumentSynced={(doc) => {
-                // Update document in store after single doc sync
-                if (selectedBookId) {
-                  const docs = getDocumentsForBook(selectedBookId)
-                  const updatedDocs = docs.map(d => 
-                    d.id === doc.id ? { ...d, ...doc } : d
-                  )
-                  setDocuments(selectedBookId, updatedDocs)
+                  addToHistory({ 
+                    filePath: doc.localPath, 
+                    title: doc.title, 
+                    bookId, 
+                    bookName: books.find(b => b.id === bookId)?.name 
+                  })
                 }
               }}
             />
-          </div>
+          ) : (
+            <>
+              {/* Document list with fixed width */}
+              <div 
+                style={{ width: documentListWidth }} 
+                className="flex-shrink-0 overflow-auto border-r border-border-light transition-all duration-200"
+              >
+                <DocumentTree
+                  documents={currentDocs}
+                  loading={isLoadingDocs}
+                  emptyMessage={selectedBookId ? '暂无文档' : '请选择知识库'}
+                  bookInfo={selectedBook ? { userLogin: selectedBook.userLogin, slug: selectedBook.slug } : undefined}
+                  bookId={selectedBookId || undefined}
+                  hideFailedDocs={hideFailedDocs}
+                  onPreview={(doc) => {
+                    if (doc.localPath) {
+                      setPreviewDoc({ filePath: doc.localPath, title: doc.title })
+                      addToHistory({ filePath: doc.localPath, title: doc.title, bookId: selectedBookId || undefined, bookName: selectedBook?.name })
+                    }
+                  }}
+                  onDocumentSynced={(doc) => {
+                    // Update document in store after single doc sync
+                    if (selectedBookId) {
+                      const docs = getDocumentsForBook(selectedBookId)
+                      const updatedDocs = docs.map(d => 
+                        d.id === doc.id ? { ...d, ...doc } : d
+                      )
+                      setDocuments(selectedBookId, updatedDocs)
+                    }
+                  }}
+                />
+              </div>
 
-          {/* Document List Resizer */}
-          <PanelResizer
-            direction="horizontal"
-            onResize={(delta) => setDocumentListWidth(documentListWidth + delta)}
-            onResizeEnd={saveLayout}
-          />
+              {/* Document List Resizer */}
+              <PanelResizer
+                direction="horizontal"
+                onResize={(delta) => setDocumentListWidth(documentListWidth + delta)}
+                onResizeEnd={saveLayout}
+              />
 
-          {/* Preview area - fills remaining space */}
-          {previewDoc ? (
-            <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
-              <MarkdownPreview
-                filePath={previewDoc.filePath}
-                title={previewDoc.title}
-                onClose={() => setPreviewDoc(null)}
-                onOpenExternal={() => {
-                  if (window.electronAPI) {
+              {/* Preview area - fills remaining space */}
+              {previewDoc ? (
+                <div className="flex-1 flex flex-col overflow-hidden bg-bg-primary">
+                  <MarkdownPreview
+                    filePath={previewDoc.filePath}
+                    title={previewDoc.title}
+                    onClose={() => setPreviewDoc(null)}
+                    onOpenExternal={() => {
+                      if (window.electronAPI) {
                     window.electronAPI['file:open'](previewDoc.filePath)
                   }
                 }}
@@ -729,12 +792,12 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                     window.electronAPI['file:showInFolder'](previewDoc.filePath)
                   }
                 }}
-                isPanel
-                fontSize={previewFontSize}
-              />
-            </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center bg-bg-secondary">
+                    isPanel
+                    fontSize={previewFontSize}
+                  />
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center justify-center bg-bg-secondary">
               <div className="max-w-md text-center px-6">
                 {/* Icon */}
                 <svg className="w-20 h-20 mx-auto mb-6 text-text-quaternary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -786,6 +849,8 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                 )}
               </div>
             </div>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -11,6 +11,7 @@ export { HiddenBooksPanel } from './HiddenBooksPanel'
 export { BookList } from './BookList'
 export { DocumentTree } from './DocumentTree'
 export { UnifiedSearchModal } from './UnifiedSearchModal'
+export { AllBooksView } from './AllBooksView'
 
 // UI Components
 export * from './ui'
