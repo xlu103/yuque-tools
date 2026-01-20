@@ -613,7 +613,15 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                   key={i}
                   icon={<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                   label={item.title}
-                  onClick={() => setPreviewDoc({ filePath: item.filePath, title: item.title })}
+                  onClick={() => {
+                    // Switch to the book if bookId exists
+                    if (item.bookId) {
+                      setShowAllBooksView(false)
+                      handleSelectBook(item.bookId)
+                    }
+                    // Open preview
+                    setPreviewDoc({ filePath: item.filePath, title: item.title })
+                  }}
                 />
               ))}
             </SidebarSection>
@@ -908,7 +916,15 @@ export function MainLayout({ session, onLogout }: MainLayoutProps) {
                       {readingHistory.slice(0, 3).map((item, i) => (
                         <button
                           key={i}
-                          onClick={() => setPreviewDoc({ filePath: item.filePath, title: item.title })}
+                          onClick={() => {
+                            // Switch to the book if bookId exists
+                            if (item.bookId) {
+                              setShowAllBooksView(false)
+                              handleSelectBook(item.bookId)
+                            }
+                            // Open preview
+                            setPreviewDoc({ filePath: item.filePath, title: item.title })
+                          }}
                           className="w-full flex items-center gap-3 px-3 py-2 text-left bg-bg-primary hover:bg-bg-tertiary rounded-lg border border-border-light transition-colors group"
                         >
                           <svg className="w-4 h-4 text-text-tertiary group-hover:text-accent flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

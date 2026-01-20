@@ -132,10 +132,16 @@ function DocumentTreeNode({
   return (
     <div className="animate-fade-in">
       <div
-        className={`px-4 py-2 hover:bg-bg-secondary transition-all duration-150 group cursor-pointer flex items-start gap-2 ${
-          isSelected ? 'bg-accent/5' : ''
-        } ${isSyncing ? 'bg-accent/5' : ''} ${isCurrentPreview ? 'bg-accent/10 border-l-4 border-l-accent' : ''}`}
-        style={{ paddingLeft: `${16 + node.level * 20}px` }}
+        className={`py-2 transition-all duration-150 group cursor-pointer flex items-start gap-2 ${
+          isCurrentPreview 
+            ? 'bg-accent/15 border-l-4 border-l-accent pl-3' 
+            : isSelected 
+              ? 'bg-accent/5 pl-4' 
+              : isSyncing 
+                ? 'bg-accent/5 pl-4' 
+                : 'pl-4 hover:bg-bg-secondary'
+        }`}
+        style={{ paddingLeft: isCurrentPreview ? `${12 + node.level * 20}px` : `${16 + node.level * 20}px` }}
         onClick={handleClick}
         onContextMenu={(e) => !isFolder && onContextMenu(e, node)}
       >
@@ -215,7 +221,7 @@ function DocumentTreeNode({
         </div>
 
         {/* Document info */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 pr-4">
           <Tooltip content={
             node.localSyncedAt 
               ? `${node.title}\n同步于 ${new Date(node.localSyncedAt).toLocaleString('zh-CN', {
@@ -227,7 +233,13 @@ function DocumentTreeNode({
                 })}`
               : node.title
           }>
-            <h3 className={`text-sm font-medium text-text-primary truncate transition-colors ${isFolder ? 'font-semibold' : ''}`}>
+            <h3 className={`text-sm font-medium truncate transition-colors ${
+              isCurrentPreview 
+                ? 'text-accent font-semibold' 
+                : isFolder 
+                  ? 'text-text-primary font-semibold' 
+                  : 'text-text-primary'
+            }`}>
               {node.title}
             </h3>
           </Tooltip>
